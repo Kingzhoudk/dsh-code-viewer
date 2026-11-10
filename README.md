@@ -63,12 +63,20 @@ https://github.com/material-extensions/vscode-material-icon-theme）的官方素
 
 ## 安装
 
+需要 DSH `>=0.2.2-rc.1 <0.3.0`。从 GitHub 安装：
+
 ```sh
-# 在本会话里由插件管理器安装（等价于 dsh plugin --profile web add link:<目录>）
-# target: /home/dk/workspace/dsh-code-viewer
+dsh plugin add github:Kingzhoudk/dsh-code-viewer
+# 等价的显式 git spec
+dsh plugin add git+https://github.com/Kingzhoudk/dsh-code-viewer.git
 ```
 
-安装后刷新页面：右侧栏的 Guide 页会出现「CodeIDE」入口，或按面板提示里显示的那个键（桌面端默认 `Cmd/Ctrl+L`，Web 端 `Cmd/Ctrl+Shift+L`）。
+也可以在 Web 的 **Plugins** 页安装，或让 agent 调用 `plugin_manager`
+（action `install_bundle`，target 用同一 spec）。插件管理器会写入 profile 依赖并启用这个
+bundle；开发时可改用 `dsh plugin add link:<本仓库绝对路径>` 安装本地 checkout。
+
+安装后刷新页面：右侧栏的 Guide 页会出现「CodeIDE」入口，或按面板提示里显示的那个键（桌面端默认
+`Cmd/Ctrl+L`，Web 端 `Cmd/Ctrl+Shift+L`）。
 
 ## 已知边界
 
