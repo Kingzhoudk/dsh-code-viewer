@@ -17,6 +17,7 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "LICENSE",
     "index.js",
     "client.js",
     "cordis.patch.yml",

@@ -1,3 +1,5 @@
+![CodeIDE icon](icon.svg)
+
 # CodeIDE · VS Code 风格的右侧栏面板
 
 为 DeepSeek Harness Web GUI 增加一个右侧栏标签页（kind = `code`），形状与 VS Code 一致：
@@ -96,3 +98,9 @@ bundle；开发时可改用 `dsh plugin add link:<本仓库绝对路径>` 安装
 - 文件树根目录用的是会话的**绝对工作目录**（Host 的 `workspaceFiles.list` 拒绝空路径），若与工作区根目录不一致会自动改用相对形式重试一次。
 - 单次请求 12 秒（读文件 15 秒）未返回即转为可见错误，不会一直转圈。
 - 想对照：右侧栏自带的「Files」标签用的是同一套服务；如果它同样报错，问题在该会话的工作区解析，而不是本面板。
+
+## 许可证
+
+MIT，见 [LICENSE](LICENSE)。内置的 Material Icon Theme 素材与 xterm.js 资产分别遵循
+[`LICENSE-material-icon-theme`](LICENSE-material-icon-theme) 与
+[`vendor/LICENSE-xterm`](vendor/LICENSE-xterm) 中的第三方许可。
