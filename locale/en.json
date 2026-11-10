@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "CodeIDE",
+    "description": "VS Code-style toolbox in the right Sidebar: workspace file tree, an auto-saving code editor with syntax highlighting, image preview, a read-only Git graph and an embedded command line; one shortcut turns the current file into an @file reference in the composer."
+  }
+}

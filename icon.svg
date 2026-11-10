@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="CodeIDE">
+  <rect x="3" y="7" width="58" height="50" rx="8" fill="#0f2c46"/>
+  <rect x="7" y="11" width="19" height="42" rx="4" fill="#123f63"/>
+  <g stroke="#6ec4ff" stroke-width="2.4" stroke-linecap="round">
+    <path d="M11 18h11"/>
+    <path d="M14 25h8"/>
+    <path d="M14 32h8"/>
+    <path d="M11 39h11"/>
+  </g>
+  <g stroke="#eaf6ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M38 22l-7 8 7 8"/>
+    <path d="M47 22l7 8-7 8"/>
+  </g>
+  <g fill="#247bbf">
+    <circle cx="53" cy="46" r="3"/>
+    <circle cx="46" cy="52" r="3"/>
+  </g>
+  <g stroke="#247bbf" stroke-width="2" fill="none" stroke-linecap="round">
+    <path d="M53 46c0 3-3 3-4 4"/>
+  </g>
+</svg>

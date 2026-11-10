@@ -1,0 +1,11 @@
+# dsh-code-viewer: a VS Code-style code toolbox in the right Sidebar.
+#
+#   - code-viewer   host half: `/plugins/code-viewer` endpoints used by the
+#                   panel (Git history, image bytes, vendored xterm assets,
+#                   file stat and conflict-checked saves).
+#
+# The browser half loads automatically: the Web client module system picks up
+# this package's `dsh.client` declaration alongside this Loader entry.
+- insert:
+    - id: code-viewer
+      name: dsh-code-viewer
