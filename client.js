@@ -138,6 +138,7 @@ window.__ModuleLoader__.load({
       'term.phase.closed': 'closed',
       'term.phase.failed': 'failed',
       'term.phase.unavailable': 'terminal unavailable',
+      'term.retry': 'Retry',
     }
 
     const ZH = {
@@ -241,6 +242,7 @@ window.__ModuleLoader__.load({
       'term.phase.closed': '已关闭',
       'term.phase.failed': '连接失败',
       'term.phase.unavailable': '终端不可用',
+      'term.retry': '重试',
     }
 
     const MONO = 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace'
@@ -373,6 +375,7 @@ window.__ModuleLoader__.load({
 .dcv-modes { display: inline-flex; gap: 2px; flex: 0 0 auto; }
 .dcv-materialIcon { flex: 0 0 auto; display: block; border-radius: 2px; }
 .dcv-docHead .dcv-materialIcon { margin-right: 2px; }
+.dcv-brandIcon { display: block; flex: 0 0 auto; border-radius: 4px; }
 .dcv-mdScroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px 14px 24px; }
 .dcv-md { max-width: 900px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 1.65; }
 .dcv-md-h { font-weight: 650; line-height: 1.3; margin: 14px 0 8px; color: var(--dsw-alias-label-primary); }
@@ -450,6 +453,11 @@ window.__ModuleLoader__.load({
   border-bottom: 1px solid var(--dsw-alias-border-l1); }
 .dcv-termTitle { font-size: 11px; font-weight: 600; white-space: nowrap; }
 .dcv-termPhase { font-size: 10px; color: var(--dsw-alias-label-secondary); margin-left: auto; white-space: nowrap; }
+.dcv-termError { display: flex; align-items: center; gap: 8px; padding: 4px 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1); color: var(--dsw-alias-state-error-primary);
+  font-size: 11px; }
+.dcv-termErrorMessage { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
 .dcv-termBody { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 4px 8px; }
 .dcv-termScreen { margin: 0; font-family: ${MONO}; font-size: 11.5px; line-height: 17px;
   white-space: pre-wrap; word-break: break-word; color: var(--dsw-alias-label-primary); }
@@ -488,6 +496,18 @@ window.__ModuleLoader__.load({
     ])
     const IconChevronRight = icon([h('path', { key: 'a', d: 'M9 6l6 6-6 6' })])
     const IconChevronDown = icon([h('path', { key: 'a', d: 'M6 9l6 6 6-6' })])
+    /** The plugin's own app icon, drawn as an image so the guide card can show it. */
+    const ICON_CODEIDE_URI = 'data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20width%3D%2264%22%20height%3D%2264%22%20role%3D%22img%22%20aria-label%3D%22CodeIDE%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22codeide-bg%22%20x1%3D%2210%22%20y1%3D%224%22%20x2%3D%2254%22%20y2%3D%2260%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%233B82F6%22%2F%3E%3Cstop%20offset%3D%220.55%22%20stop-color%3D%22%232563EB%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23101F63%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22codeide-shine%22%20x1%3D%228%22%20y1%3D%224%22%20x2%3D%2240%22%20y2%3D%2238%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23FFFFFF%22%20stop-opacity%3D%220.3%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23FFFFFF%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22codeide-slash%22%20x1%3D%2229%22%20y1%3D%2218%22%20x2%3D%2236%22%20y2%3D%2246%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%238BE9FF%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2338BDF8%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%2258%22%20height%3D%2258%22%20rx%3D%2215%22%20fill%3D%22url%28%23codeide-bg%29%22%2F%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%2258%22%20height%3D%2258%22%20rx%3D%2215%22%20fill%3D%22url%28%23codeide-shine%29%22%2F%3E%3Crect%20x%3D%223.75%22%20y%3D%223.75%22%20width%3D%2256.5%22%20height%3D%2256.5%22%20rx%3D%2214.25%22%20fill%3D%22none%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.18%22%20stroke-width%3D%221.5%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M25%2021%2013.5%2032%2025%2043%22%2F%3E%3Cpath%20d%3D%22M39%2021l11.5%2011L39%2043%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M36.2%2017.5%2028%2046.5%22%20fill%3D%22none%22%20stroke%3D%22url%28%23codeide-slash%29%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%2F%3E%3Crect%20x%3D%2217%22%20y%3D%2251.5%22%20width%3D%2230%22%20height%3D%223.2%22%20rx%3D%221.6%22%20fill%3D%22%238BE9FF%22%20opacity%3D%220.85%22%2F%3E%3C%2Fsvg%3E'
+
+    const IconCodeIDE = ({ size }) => h('img', {
+      className: 'dcv-brandIcon',
+      src: ICON_CODEIDE_URI,
+      width: size === undefined ? 16 : size,
+      height: size === undefined ? 16 : size,
+      alt: '',
+      draggable: false,
+    })
+
     const IconTerminal = icon([
       h('rect', { key: 'a', x: 3, y: 4, width: 18, height: 16, rx: 2 }),
       h('path', { key: 'b', d: 'M7 9l3 3-3 3' }),
@@ -1972,6 +1992,20 @@ window.__ModuleLoader__.load({
         const [draft, setDraft] = useState('')
         const [error, setError] = useState(null)
         const [xtermModule, setXtermModule] = useState(null)
+        const [attempt, setAttempt] = useState(0)
+        const identityRef = useRef({ key: 'code-viewer', content: 'code-viewer://terminal', service: null })
+        const retryRef = useRef(null)
+
+        /** The Host terminal id survives page reloads; reattaching avoids a new PTY each time. */
+        const savedTerminalId = () => {
+          try { return window.localStorage.getItem(`codeide.terminal.${sessionId}`) || undefined } catch (_noStorage) { return undefined }
+        }
+        const rememberTerminalId = (id) => {
+          try { window.localStorage.setItem(`codeide.terminal.${sessionId}`, id) } catch (_noStorage) { /* private mode */ }
+        }
+        const forgetTerminalId = () => {
+          try { window.localStorage.removeItem(`codeide.terminal.${sessionId}`) } catch (_noStorage) { /* private mode */ }
+        }
         const bufferRef = useRef({ lines: [''], cursor: { row: 0, column: 0 } })
         const viewRef = useRef(null)
         const pendingRef = useRef([])
@@ -1988,9 +2022,12 @@ window.__ModuleLoader__.load({
             setPhase('unavailable')
             return undefined
           }
+          const key = attempt === 0 ? 'code-viewer' : `code-viewer-${attempt}`
+          const content = attempt === 0 ? 'code-viewer://terminal' : `code-viewer://terminal/${attempt}`
+          identityRef.current = { key, content, service: webTerminals }
           let view
           try {
-            view = webTerminals.view(sessionId, 'code-viewer', 'code-viewer://terminal')
+            view = webTerminals.view(sessionId, key, content, attempt === 0 ? savedTerminalId() : undefined)
           } catch (failure) {
             setPhase('failed')
             setError(failure instanceof Error ? failure.message : String(failure))
@@ -2000,10 +2037,20 @@ window.__ModuleLoader__.load({
           revisionRef.current = 0
           bufferRef.current = { lines: [''], cursor: { row: 0, column: 0 } }
           let sawSnapshot = false
+          let retryTimer = null
           const sync = () => {
             const state = view.state.getSnapshot()
             setPhase(state.phase)
             setError(state.error === undefined || state.error === null ? null : state.error)
+            if (state.info !== undefined && state.info !== null && typeof state.info.id === 'string' && state.info.id !== '') {
+              rememberTerminalId(state.info.id)
+            }
+            // A remembered terminal that no longer exists must not be retried as-is.
+            if (state.phase === 'failed') forgetTerminalId()
+            // One quiet retry: a first attach can lose a race with the Host.
+            if (state.phase === 'failed' && attempt === 0 && retryTimer === null && retryRef.current !== null) {
+              retryTimer = window.setTimeout(() => { retryRef.current() }, 1500)
+            }
             if (state.writable === true && pendingRef.current.length > 0) {
               const queued = pendingRef.current
               pendingRef.current = []
@@ -2044,11 +2091,23 @@ window.__ModuleLoader__.load({
           const detach = view.mount()
           sync()
           return () => {
+            if (retryTimer !== null) window.clearTimeout(retryTimer)
             unsubscribe()
             detach()
             viewRef.current = null
           }
+        }, [sessionId, attempt])
+
+        /** Replace a failed terminal view with a fresh one. */
+        const retryTerminal = useCallback(() => {
+          const { key, content, service } = identityRef.current
+          try {
+            if (service !== null && typeof service.close === 'function') service.close(sessionId, key, content)
+          } catch (_closeFailed) { /* the view may never have reached the Host */ }
+          setError(null)
+          setAttempt(value => value + 1)
         }, [sessionId])
+        retryRef.current = retryTerminal
 
         // Prefer the real terminal component: xterm plus this plugin's PTY
         // stream. Environments without ResizeObserver/matchMedia keep the text
@@ -2195,6 +2254,15 @@ window.__ModuleLoader__.load({
               type: 'button', className: 'dcv-tool dcv-mini', title: t('term.close'),
               onClick: () => { if (typeof props.onClose === 'function') props.onClose() },
             }, h(IconClose, { size: 13 }))),
+          phase === 'failed' || phase === 'disconnected'
+            ? h('div', { className: 'dcv-termError' },
+              h('span', { className: 'dcv-termErrorMessage' },
+                error === null ? t('term.failed') : `${t('term.failed')}: ${error}`),
+              h('button', {
+                type: 'button', className: 'dcv-tab',
+                onClick: () => { retryTerminal() },
+              }, t('term.retry')))
+            : null,
           xtermModule === null
             ? h('div', { className: 'dcv-termBody', ref: bodyRef },
               h('pre', { className: 'dcv-termScreen' }, lines.join('\n')))
@@ -3195,7 +3263,7 @@ window.__ModuleLoader__.load({
           h('style', { key: 'style', 'data-plugin': ID }, CSS),
           h('div', { className: 'dcv-header' },
             h('span', { className: 'dcv-headTitle' },
-              h(IconCode, { size: 14 }),
+              h(IconCodeIDE, { size: 15 }),
               h('span', { className: 'dcv-title' }, t('panel.title')),
               branchText === null ? null : h('span', { className: 'dcv-chip', title: t('git.branch') }, h(MaterialIcon, { glyph: 'git', size: 12 }), branchText)),
             h('span', { className: 'dcv-headActions' },
@@ -3296,7 +3364,7 @@ window.__ModuleLoader__.load({
           order: 15,
           title: () => t('guide.title'),
           description: () => t('guide.description'),
-          icon: IconCode,
+          icon: IconCodeIDE,
         }],
       }), 'code-viewer: tab type')
 
