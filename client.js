@@ -116,6 +116,28 @@ window.__ModuleLoader__.load({
       'notice.noReference': 'Select a file first',
       'notice.noInput': 'The composer is not available',
       'notice.failed': 'Could not insert the reference',
+      'menu.newFile': 'New file',
+      'menu.newFolder': 'New folder',
+      'menu.rename': 'Rename',
+      'menu.copy': 'Copy',
+      'menu.cut': 'Cut',
+      'menu.paste': 'Paste',
+      'menu.delete': 'Delete',
+      'menu.reveal': 'Reveal in file manager',
+      'menu.reference': 'Reference',
+      'menu.copyRelPath': 'Copy relative path',
+      'menu.copyAbsPath': 'Copy absolute path',
+      'menu.refresh': 'Refresh',
+      'menu.copySelection': 'Copy',
+      'menu.pasteText': 'Paste',
+      'menu.deleteConfirm': 'Delete "{path}" permanently?',
+      'menu.invalidName': 'Invalid file name',
+      'menu.failed': 'Operation failed',
+      'menu.copyDone': 'Copied {path}',
+      'menu.cutDone': 'Cut {path}',
+      'menu.copiedPath': 'Copied',
+      'menu.copyFailed': 'Clipboard is not available',
+      'menu.pasteFailed': 'Cannot read the clipboard',
       'command.open': 'CodeIDE',
       'command.reserved': 'CodeIDE (fixed keys)',
       'command.blocked': 'Open a conversation first',
@@ -220,6 +242,28 @@ window.__ModuleLoader__.load({
       'notice.noReference': '请先选择一个文件',
       'notice.noInput': '对话框当前不可用',
       'notice.failed': '插入引用失败',
+      'menu.newFile': '新建文件',
+      'menu.newFolder': '新建文件夹',
+      'menu.rename': '重命名',
+      'menu.copy': '复制',
+      'menu.cut': '剪切',
+      'menu.paste': '粘贴',
+      'menu.delete': '删除',
+      'menu.reveal': '在文件管理器中显示',
+      'menu.reference': '引用',
+      'menu.copyRelPath': '复制相对路径',
+      'menu.copyAbsPath': '复制绝对路径',
+      'menu.refresh': '刷新',
+      'menu.copySelection': '复制',
+      'menu.pasteText': '粘贴',
+      'menu.deleteConfirm': '永久删除「{path}」？',
+      'menu.invalidName': '文件名不合法',
+      'menu.failed': '操作失败',
+      'menu.copyDone': '已复制 {path}',
+      'menu.cutDone': '已剪切 {path}',
+      'menu.copiedPath': '已复制',
+      'menu.copyFailed': '无法访问剪贴板',
+      'menu.pasteFailed': '无法读取剪贴板',
       'command.open': 'CodeIDE',
       'command.reserved': 'CodeIDE（固定键）',
       'command.blocked': '请先打开一个会话',
@@ -441,6 +485,21 @@ window.__ModuleLoader__.load({
 .dcv-splitHunk td { white-space: pre; padding: 2px 8px; color: var(--dsw-alias-brand-primary);
   background: var(--dsw-alias-bg-layer-2); }
 .dcv-termWrap { display: flex; flex-direction: column; flex: 0 0 auto; min-height: 110px; max-height: 78%; }
+.dcv-menu { position: fixed; z-index: 60; padding: 4px; border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2); border: 1px solid var(--dsw-alias-border-l2);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35); }
+.dcv-menuItem { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px;
+  border: none; border-radius: 5px; background: transparent; color: var(--dsw-alias-label-primary);
+  font-size: 12px; text-align: left; cursor: pointer; }
+.dcv-menuItem:hover { background: var(--dsw-alias-bg-layer-3); }
+.dcv-menuItem.is-danger { color: var(--dsw-alias-state-error-primary); }
+.dcv-menuItem.is-disabled { opacity: 0.45; cursor: default; }
+.dcv-menuSep { height: 1px; margin: 4px 6px; background: var(--dsw-alias-border-l1); }
+.dcv-inlineEdit { display: flex; align-items: center; gap: 6px; padding: 3px 8px; }
+.dcv-inlineLabel { font-size: 10px; color: var(--dsw-alias-label-secondary); white-space: nowrap; }
+.dcv-inlineInput { flex: 1 1 auto; min-width: 0; border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 4px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary);
+  font-family: ${MONO}; font-size: 11px; padding: 2px 5px; outline: none; }
 .dcv-term { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
   background: var(--dsw-alias-bg-layer-1); }
 .dcv-resizer { flex: 0 0 auto; background: transparent; position: relative; z-index: 3;
@@ -2334,6 +2393,9 @@ window.__ModuleLoader__.load({
         const [editMtime, setEditMtime] = useState(null)
         const [saveState, setSaveState] = useState('idle')
         const [saveMessage, setSaveMessage] = useState(null)
+        const [menu, setMenu] = useState(null)
+        const [inlineEdit, setInlineEdit] = useState(null)
+        const clipboardRef = useRef(null)
         const [diffMarks, setDiffMarks] = useState({})
         const [diffUntracked, setDiffUntracked] = useState(false)
         const editorRef = useRef(null)
@@ -2781,6 +2843,7 @@ window.__ModuleLoader__.load({
                 className: 'dcv-row dcv-dir' + (changedDirs.has(full) ? ' is-changed-dir' : ''),
                 style: { paddingLeft: 4 + depth * 12 }, title: full,
                 onClick: () => toggleDir(full),
+                onContextMenu: (event) => { openMenu(event, { kind: 'dir', path: full }) },
               }, h(open ? IconChevronDown : IconChevronRight, { size: 13 }), h(MaterialIcon, { name: entry.name, directory: true, expanded: open, size: 16 }), h('span', { className: 'dcv-name' }, entry.name),
               changedDirs.has(full) ? h('span', { className: 'dcv-dirDot', title: t('git.containsChanges') }, '\u25cf') : null))
               if (open) rows.push(renderTree(full, depth + 1))
@@ -2792,6 +2855,7 @@ window.__ModuleLoader__.load({
                 className: 'dcv-row dcv-file' + (mark === null ? '' : ` is-changed is-${mark.cls}`) + (active ? ' is-active' : ''),
                 style: { paddingLeft: 18 + depth * 12 }, title: full,
                 onClick: () => { void openFile(full) },
+                onContextMenu: (event) => { openMenu(event, { kind: 'file', path: full }) },
               }, h(MaterialIcon, { name: entry.name, size: 16 }), h('span', { className: 'dcv-name' }, entry.name),
               mark === null ? null : h('span', { className: `dcv-mark dcv-mark-${mark.cls}`, title: mark.label }, mark.letter)))
             }
@@ -2898,6 +2962,263 @@ window.__ModuleLoader__.load({
           } catch (_noFlush) { /* nothing else to do while unmounting */ }
         }, [])
 
+        /* ------------------------------------------------------------ context menu */
+
+        const parentOfPath = (rel) => {
+          const index = rel.lastIndexOf('/')
+          return index === -1 ? '' : rel.slice(0, index)
+        }
+        const nameOfPath = (rel) => {
+          const index = rel.lastIndexOf('/')
+          return index === -1 ? rel : rel.slice(index + 1)
+        }
+        const absoluteOf = (rel) => {
+          const base = typeof cwd === 'string' ? cwd.replace(/[\\/]+$/u, '') : ''
+          return rel === '' ? base : `${base}/${rel}`
+        }
+
+        const flash = (message) => { setNotice(message) }
+
+        const writeClipboard = async (text) => {
+          try {
+            await navigator.clipboard.writeText(text)
+            flash(t('menu.copiedPath'))
+            return true
+          } catch (_denied) {
+            try {
+              const node = document.createElement('textarea')
+              node.value = text
+              node.style.position = 'fixed'
+              node.style.opacity = '0'
+              document.body.appendChild(node)
+              node.select()
+              document.execCommand('copy')
+              node.remove()
+              flash(t('menu.copiedPath'))
+              return true
+            } catch (_noClipboard) {
+              flash(t('menu.copyFailed'))
+              return false
+            }
+          }
+        }
+
+        const openMenu = (event, target) => {
+          event.preventDefault()
+          event.stopPropagation()
+          setMenu({ x: event.clientX, y: event.clientY, ...target })
+        }
+
+        const runOperation = async (operation, payload, dir) => {
+          try {
+            await apiPost(operation, payload, { path: cwd })
+            if (typeof dir === 'string') void loadDir(dir)
+            void refreshStatus(cwd)
+            return true
+          } catch (failure) {
+            flash(`${t('menu.failed')}: ${failure instanceof Error ? failure.message : String(failure)}`)
+            return false
+          }
+        }
+
+        const createIn = async (parent, name, kind) => {
+          if (/[\\/]/u.test(name) || name === '.' || name === '..' || name === '') { flash(t('menu.invalidName')); return }
+          const rel = parent === '' ? name : `${parent}/${name}`
+          if (await runOperation(kind === 'dir' ? '/mkdir' : '/touch', { rel }, parent)) {
+            setExpanded(previous => ({ ...previous, [parent]: true }))
+          }
+        }
+
+        const renameTo = async (from, name) => {
+          if (/[\\/]/u.test(name) || name === '.' || name === '..' || name === '') { flash(t('menu.invalidName')); return }
+          const dir = parentOfPath(from)
+          if (!(await runOperation('/rename', { rel: from, name }, dir))) return
+          if (selected !== null && (selected.path === from || selected.path.startsWith(`${from}/`))) {
+            void openFile(dir === '' ? name : `${dir}/${name}`)
+          }
+        }
+
+        const deletePath = async (rel) => {
+          const confirmed = typeof window.confirm === 'function' ? window.confirm(t('menu.deleteConfirm', { path: rel })) : true
+          if (!confirmed) return
+          if (!(await runOperation('/delete', { rel }, parentOfPath(rel)))) return
+          if (selected !== null && (selected.path === rel || selected.path.startsWith(`${rel}/`))) {
+            setSelected(null)
+            setDoc({ status: 'idle' })
+          }
+        }
+
+        const copyEntry = (rel, cut) => {
+          clipboardRef.current = { path: rel, cut }
+          flash(t(cut ? 'menu.cutDone' : 'menu.copyDone', { path: rel }))
+        }
+
+        const pasteInto = async (dir) => {
+          const clip = clipboardRef.current
+          if (clip === null || clip === undefined) return
+          const ok = await runOperation('/copy', { rel: clip.path, toDir: dir, move: clip.cut }, dir)
+          if (ok && clip.cut) clipboardRef.current = null
+        }
+
+        const revealPath = async (rel) => {
+          try {
+            await apiPost('/reveal', { rel }, { path: cwd })
+          } catch (failure) {
+            flash(`${t('menu.failed')}: ${failure instanceof Error ? failure.message : String(failure)}`)
+          }
+        }
+
+        const referenceNow = (range) => {
+          const result = insertReference(sessionId, inputActions, stateRef.current.path, range)
+          if (result.ok) flash(t('notice.referenced'))
+          else if (result.reason === 'no-file') flash(t('notice.noReference'))
+          else if (result.reason === 'no-input') flash(t('notice.noInput'))
+          else flash(t('notice.failed'))
+        }
+
+        const editorText = () => {
+          const area = editorRef.current
+          if (area === null) return ''
+          const start = area.selectionStart
+          const end = area.selectionEnd
+          if (start !== end) return area.value.slice(start, end)
+          const lineStart = area.value.lastIndexOf('\n', Math.max(0, start - 1)) + 1
+          const lineEnd = area.value.indexOf('\n', start)
+          return area.value.slice(lineStart, lineEnd === -1 ? area.value.length : lineEnd)
+        }
+
+        const pasteIntoEditor = async () => {
+          let text = ''
+          try { text = await navigator.clipboard.readText() } catch (_denied) { flash(t('menu.pasteFailed')); return }
+          if (text === '') return
+          const area = editorRef.current
+          if (area === null) return
+          const start = area.selectionStart
+          const end = area.selectionEnd
+          setEditText(editText.slice(0, start) + text + editText.slice(end))
+          requestAnimationFrame(() => {
+            const caret = start + text.length
+            area.selectionStart = caret
+            area.selectionEnd = caret
+          })
+        }
+
+        /** Build the items for the current menu target. */
+        function buildMenuItems(entry) {
+          const items = []
+          const push = (id, label, run, options) => items.push({ id, label, run, ...options })
+          if (entry.kind === 'editor') {
+            push('copy', t('menu.copySelection'), () => { void writeClipboard(editorText()) }, { glyph: 'file' })
+            push('paste', t('menu.pasteText'), () => { void pasteIntoEditor() }, { glyph: 'file' })
+            push('reference', t('menu.reference'), () => { referenceNow(selectionRange()) }, { glyph: 'git' })
+            return items
+          }
+          if (entry.kind === 'doc') {
+            push('reference', t('menu.reference'), () => { referenceNow(null) })
+            push('copy-rel', t('menu.copyRelPath'), () => { void writeClipboard(entry.path) })
+            push('copy-abs', t('menu.copyAbsPath'), () => { void writeClipboard(absoluteOf(entry.path)) })
+            return items
+          }
+          const isDir = entry.kind === 'dir'
+          const isRoot = entry.kind === 'root'
+          const dir = isRoot ? '' : (isDir ? entry.path : parentOfPath(entry.path))
+          push('new-file', t('menu.newFile'), () => { setInlineEdit({ mode: 'new-file', parent: dir, value: '' }) })
+          push('new-folder', t('menu.newFolder'), () => { setInlineEdit({ mode: 'new-dir', parent: dir, value: '' }) })
+          if (!isRoot) {
+            items.push({ sep: true })
+            push('rename', t('menu.rename'), () => { setInlineEdit({ mode: 'rename', parent: parentOfPath(entry.path), from: entry.path, value: nameOfPath(entry.path) }) })
+            push('copy', t('menu.copy'), () => { copyEntry(entry.path, false) })
+            push('cut', t('menu.cut'), () => { copyEntry(entry.path, true) })
+          }
+          push('paste', t('menu.paste'), () => { void pasteInto(dir) }, { disabled: clipboardRef.current === null || clipboardRef.current === undefined })
+          if (!isRoot) {
+            items.push({ sep: true })
+            push('reference', t('menu.reference'), () => { referenceNow(null) })
+            push('copy-rel', t('menu.copyRelPath'), () => { void writeClipboard(entry.path) })
+            push('copy-abs', t('menu.copyAbsPath'), () => { void writeClipboard(absoluteOf(entry.path)) })
+            push('reveal', t('menu.reveal'), () => { void revealPath(entry.path) })
+            items.push({ sep: true })
+            push('delete', t('menu.delete'), () => { void deletePath(entry.path) }, { danger: true })
+          } else {
+            push('refresh', t('menu.refresh'), () => { void loadDir(''); void refreshStatus(cwd) })
+          }
+          return items
+        }
+
+        function renderContextMenu() {
+          if (menu === null) return null
+          const items = buildMenuItems(menu)
+          const width = 220
+          const viewportWidth = typeof window === 'undefined' ? 1280 : window.innerWidth
+          const viewportHeight = typeof window === 'undefined' ? 800 : window.innerHeight
+          const height = items.length * 28 + 12
+          const left = Math.max(8, Math.min(menu.x, viewportWidth - width - 8))
+          const top = Math.max(8, Math.min(menu.y, viewportHeight - height - 8))
+          return h('div', {
+            key: 'menu',
+            className: 'dcv-menu',
+            style: { left: `${left}px`, top: `${top}px`, width: `${width}px` },
+            role: 'menu',
+            onContextMenu: (event) => { event.preventDefault() },
+          }, items.map((item, index) => (item.sep === true
+            ? h('div', { key: `sep:${index}`, className: 'dcv-menuSep' })
+            : h('button', {
+              key: item.id,
+              type: 'button',
+              role: 'menuitem',
+              className: 'dcv-menuItem' + (item.danger === true ? ' is-danger' : '') + (item.disabled === true ? ' is-disabled' : ''),
+              disabled: item.disabled === true,
+              onClick: () => { if (item.disabled === true) return; setMenu(null); item.run() },
+            }, h('span', null, item.label)))))
+        }
+
+        // A click outside, Escape or a scroll dismisses the menu.
+        useEffect(() => {
+          if (menu === null) return undefined
+          const dismiss = (event) => {
+            if (event.type === 'keydown' && event.key !== 'Escape') return
+            if (event.type === 'mousedown' && typeof event.target.closest === 'function' && event.target.closest('.dcv-menu') !== null) return
+            setMenu(null)
+          }
+          window.addEventListener('mousedown', dismiss, true)
+          window.addEventListener('keydown', dismiss, true)
+          window.addEventListener('scroll', dismiss, true)
+          return () => {
+            window.removeEventListener('mousedown', dismiss, true)
+            window.removeEventListener('keydown', dismiss, true)
+            window.removeEventListener('scroll', dismiss, true)
+          }
+        }, [menu])
+
+        /** The inline name field for new entries and renames. */
+        function renderInlineEdit() {
+          if (inlineEdit === null) return null
+          const submit = () => {
+            const name = inlineEdit.value.trim()
+            const current = inlineEdit
+            setInlineEdit(null)
+            if (name === '') return
+            if (current.mode === 'rename') void renameTo(current.from, name)
+            else void createIn(current.parent, name, current.mode === 'new-dir' ? 'dir' : 'file')
+          }
+          return h('div', { className: 'dcv-inlineEdit' },
+            h('span', { className: 'dcv-inlineLabel' },
+              t(inlineEdit.mode === 'rename' ? 'menu.rename' : inlineEdit.mode === 'new-dir' ? 'menu.newFolder' : 'menu.newFile')),
+            h('input', {
+              className: 'dcv-inlineInput',
+              autoFocus: true,
+              spellCheck: false,
+              value: inlineEdit.value,
+              'aria-label': t('menu.newFile'),
+              onChange: (event) => { setInlineEdit({ ...inlineEdit, value: event.target.value }) },
+              onKeyDown: (event) => {
+                if (event.key === 'Enter') { event.preventDefault(); submit() }
+                if (event.key === 'Escape') { event.preventDefault(); setInlineEdit(null) }
+              },
+              onBlur: () => { setInlineEdit(null) },
+            }))
+        }
+
         /**
          * The in-place editor: a gutter, a syntax-highlighted backdrop and a
          * transparent textarea on top, so typing shows coloured code like the
@@ -2973,6 +3294,7 @@ window.__ModuleLoader__.load({
                   spellCheck: false,
                   autoComplete: 'off',
                   'aria-label': selected.path,
+                  onContextMenu: (event) => { openMenu(event, { kind: 'editor' }) },
                   onChange: (event) => { setEditText(event.target.value) },
                   onScroll: (event) => {
                     if (gutterRef.current !== null) gutterRef.current.scrollTop = event.target.scrollTop
@@ -3308,7 +3630,11 @@ window.__ModuleLoader__.load({
                   'aria-pressed': showIgnored,
                   onClick: () => { setShowIgnored(value => !value) },
                 }, h(IconFilter, { size: 13 }))),
-              h('div', { className: 'dcv-treeScroll' },
+              h('div', {
+                className: 'dcv-treeScroll',
+                onContextMenu: (event) => { openMenu(event, { kind: 'root' }) },
+              },
+                renderInlineEdit(),
                 typeof cwd !== 'string' || cwd === ''
                   ? h('div', { className: 'dcv-treeNote' }, t('tree.workspace'))
                   : renderTree('', 0))),
@@ -3320,7 +3646,13 @@ window.__ModuleLoader__.load({
               title: t('tree.resize'),
               onPointerDown: startTreeResize,
             }),
-            h('div', { className: 'dcv-main' }, mode === 'files' ? renderDocPane() : renderGitPane())),
+            h('div', {
+              className: 'dcv-main',
+              onContextMenu: (event) => {
+                if (mode !== 'files' || selected === null || doc.status !== 'ready') return
+                openMenu(event, { kind: 'doc', path: selected.path })
+              },
+            }, mode === 'files' ? renderDocPane() : renderGitPane())),
           termOpen ? h('div', { className: 'dcv-termWrap', style: { height: `${termHeight}px` } },
             h('div', {
               key: 'h-resizer',
@@ -3331,6 +3663,7 @@ window.__ModuleLoader__.load({
               onPointerDown: startTermResize,
             }),
             h(TerminalDock, { key: 'terminal', sessionId, t, onClose: () => { setTermOpen(false) } })) : null,
+          renderContextMenu(),
           notice === null ? null : h('div', { className: 'dcv-notice' }, notice))
       }
 

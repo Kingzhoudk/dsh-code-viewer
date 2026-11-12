@@ -24,9 +24,9 @@
  * are refused.
  */
 
-import { execFile } from 'node:child_process'
-import { readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
-import { dirname, extname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { execFile, spawn } from 'node:child_process'
+import { cp, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /** Required host services: the browser HTTP carrier. */
@@ -524,11 +524,135 @@ async function readStatusTree(dir) {
   return files
 }
 
+/** A relative path the panel refuses to touch: traversal, `.git` internals, empty segments. */
+function isRefusedRel(rel) {
+  if (typeof rel !== 'string' || rel === '') return true
+  if (rel.startsWith('/') || rel.includes('\\') || /^[A-Za-z]:/u.test(rel)) return true
+  return rel.split('/').some((segment) => segment === '' || segment === '.' || segment === '..' || segment === '.git')
+}
+
+/** Whether a not-yet-existing target's parent resolves inside the workspace. */
+async function parentInside(root, target) {
+  const realRoot = await realpath(root)
+  const parent = await realpath(dirname(target)).catch(() => undefined)
+  if (parent === undefined) return false
+  return parent === realRoot || parent.startsWith(`${realRoot}${sep}`)
+}
+
+/** Map a filesystem failure onto the panel's status codes. */
+function sendOperationError(res, error) {
+  const code = error === null || error === undefined ? undefined : error.code
+  const status = code === 'EEXIST' || code === 'ENOTEMPTY' || code === 'ERR_FS_CP_EEXIST' ? 409
+    : code === 'ENOENT' ? 404
+      : code === 'EINVAL' ? 400
+        : code === 'EACCES' || code === 'EPERM' ? 403
+          : 500
+  send(res, status, { error: error instanceof Error ? error.message : String(error) })
+}
+
+/** Create one file or directory inside the workspace. */
+async function createEntry(root, rel, kind) {
+  if (isRefusedRel(rel)) throw Object.assign(new Error('path outside the workspace'), { code: 'EACCES' })
+  const target = resolve(root, rel)
+  if (!target.startsWith(`${root}${sep}`)) throw Object.assign(new Error('path outside the workspace'), { code: 'EACCES' })
+  if (!(await parentInside(root, target))) throw Object.assign(new Error('path outside the workspace'), { code: 'EACCES' })
+  if (kind === 'dir') await mkdir(target)
+  else await writeFile(target, '', { flag: 'wx' })
+}
+
+/** Rename one entry inside its own directory. */
+async function renameEntry(root, rel, name) {
+  if (isRefusedRel(rel)) throw Object.assign(new Error('path outside the workspace'), { code: 'EACCES' })
+  if (typeof name !== 'string' || name === '' || name === '.' || name === '..' || /[\\/]/u.test(name) || name === '.git') {
+    throw Object.assign(new Error('invalid name'), { code: 'EINVAL' })
+  }
+  const found = await locateInside(root, rel)
+  if (found === undefined) throw Object.assign(new Error('file not found'), { code: 'ENOENT' })
+  const dest = join(dirname(found.target), name)
+  if (!(await parentInside(root, dest))) throw Object.assign(new Error('path outside the workspace'), { code: 'EACCES' })
+  const clash = await stat(dest).catch(() => undefined)
+  if (clash !== undefined) throw Object.assign(new Error('target exists'), { code: 'EEXIST' })
+  await rename(found.target, dest)
+}
+
+/** Delete one file or directory (recursive) inside the workspace. */
+async function deleteEntry(root, rel) {
+  if (isRefusedRel(rel)) throw Object.assign(new Error('path outside the workspace'), { code: 'EACCES' })
+  const found = await locateInside(root, rel)
+  if (found === undefined) throw Object.assign(new Error('file not found'), { code: 'ENOENT' })
+  if (found.target === (await realpath(root))) throw Object.assign(new Error('refusing to delete the workspace root'), { code: 'EACCES' })
+  await rm(found.target, { recursive: true, force: false })
+}
+
+/** Copy or move one entry into a workspace directory. */
+async function copyEntry(root, rel, toDir, move) {
+  if (isRefusedRel(rel)) throw Object.assign(new Error('path outside the workspace'), { code: 'EACCES' })
+  const found = await locateInside(root, rel)
+  if (found === undefined) throw Object.assign(new Error('file not found'), { code: 'ENOENT' })
+  const destination = typeof toDir === 'string' && toDir !== '' ? toDir : ''
+  if (destination !== '' && isRefusedRel(destination)) throw Object.assign(new Error('path outside the workspace'), { code: 'EACCES' })
+  const destDir = destination === '' ? root : resolve(root, destination)
+  const realRoot = await realpath(root)
+  const realDest = await realpath(destDir).catch(() => undefined)
+  if (realDest === undefined || (realDest !== realRoot && !realDest.startsWith(`${realRoot}${sep}`))) {
+    throw Object.assign(new Error('path outside the workspace'), { code: 'EACCES' })
+  }
+  const destInfo = await stat(realDest)
+  if (!destInfo.isDirectory()) throw Object.assign(new Error('target is not a directory'), { code: 'EINVAL' })
+  const dest = join(realDest, basename(found.target))
+  if (dest === found.target) throw Object.assign(new Error('source and target are the same'), { code: 'EINVAL' })
+  if (found.info.isDirectory() && dest.startsWith(`${found.target}${sep}`)) {
+    throw Object.assign(new Error('cannot copy a folder into itself'), { code: 'EINVAL' })
+  }
+  const clash = await stat(dest).catch(() => undefined)
+  if (clash !== undefined) throw Object.assign(new Error('target exists'), { code: 'EEXIST' })
+  if (move) { await rename(found.target, dest); return }
+  await cp(found.target, dest, { recursive: true, errorOnExist: true, force: false })
+}
+
+/** Open the entry's folder in the platform file manager. */
+async function revealEntry(root, rel) {
+  const found = await locateInside(root, rel)
+  if (found === undefined) throw Object.assign(new Error('file not found'), { code: 'ENOENT' })
+  const dir = found.info.isDirectory() ? found.target : dirname(found.target)
+  const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer.exe' : 'xdg-open'
+  await new Promise((resolve, reject) => {
+    const child = spawn(command, [dir], { detached: true, stdio: 'ignore' })
+    child.once('error', reject)
+    child.once('spawn', () => { child.unref(); resolve() })
+  })
+}
+
+/** One file operation request from the panel's context menu. */
+async function receiveFileOperation(res, req, root, operation) {
+  let body
+  try {
+    body = await readJsonBody(req, 64 * 1024)
+  } catch (error) {
+    send(res, error.status === undefined ? 400 : error.status, { error: error instanceof Error ? error.message : String(error) })
+    return
+  }
+  if (body === null || typeof body !== 'object') { send(res, 400, { error: 'missing body' }); return }
+  try {
+    if (operation === 'mkdir') await createEntry(root, body.rel, 'dir')
+    else if (operation === 'touch') await createEntry(root, body.rel, 'file')
+    else if (operation === 'rename') await renameEntry(root, body.rel, body.name)
+    else if (operation === 'delete') await deleteEntry(root, body.rel)
+    else if (operation === 'copy') await copyEntry(root, body.rel, body.toDir, body.move === true)
+    else if (operation === 'reveal') await revealEntry(root, body.rel)
+    else { send(res, 404, { error: 'unknown operation' }); return }
+    send(res, 200, { ok: true })
+  } catch (error) {
+    sendOperationError(res, error)
+  }
+}
+
 /** Dispatch one request under the route prefix. */
 async function handle(req, res, connection) {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const sub = url.pathname.slice(ROUTE.length)
-  const methodAllowed = sub === '/write'
+  const postEndpoints = new Set(['/write', '/mkdir', '/touch', '/rename', '/delete', '/copy', '/reveal'])
+  const methodAllowed = postEndpoints.has(sub)
     ? req.method === 'POST'
     : (req.method === 'GET' || req.method === 'HEAD')
   if (!methodAllowed) {
@@ -615,6 +739,11 @@ async function handle(req, res, connection) {
       await receiveWrite(res, req, await requireDirectory(path))
       return
     }
+    if (sub === '/mkdir' || sub === '/touch' || sub === '/rename' || sub === '/delete' || sub === '/copy' || sub === '/reveal') {
+      const dir = await requireDirectory(path)
+      await receiveFileOperation(res, req, dir, sub.slice(1))
+      return
+    }
     send(res, 404, { error: 'unknown endpoint' })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -626,7 +755,7 @@ async function handle(req, res, connection) {
  * Register the panel's read-only Git route for this plugin's lifetime.
  * @param ctx - host root context carrying the browser HTTP carrier.
  */
-export { locateInside, readStatusTree, receiveWrite, sendAsset, sendFileDiff, sendImage, sendStat }
+export { locateInside, readStatusTree, receiveFileOperation, receiveWrite, sendAsset, sendFileDiff, sendImage, sendStat }
 
 export function apply(ctx) {
   ctx.effect(() => ctx.webServer.register({

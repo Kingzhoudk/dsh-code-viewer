@@ -50,7 +50,7 @@ https://github.com/material-extensions/vscode-material-icon-theme）的官方素
 
 | 半边 | 文件 | 职责 |
 |---|---|---|
-| Host | `index.js` | `/plugins/code-viewer` 路由：`/repo`、`/log`、`/commit`、`/status`、`/stat`、`POST /write`、`/file`（图片）、`/asset`（xterm） |
+| Host | `index.js` | `/plugins/code-viewer` 路由：`/repo`、`/log`、`/commit`、`/status`、`/stat`、`POST /write`、`POST /mkdir`、`POST /touch`、`POST /rename`、`POST /delete`、`POST /copy`、`POST /reveal`、`/file`（图片）、`/asset`（xterm） |
 | Client | `client.js` | 右侧栏 tab 类型 + 面板 UI + 快捷键 + 引用桥接 |
 
 读取文件内容走 Harness 自带、按会话授权的 `remote.workspaceFiles`；仓库历史、图片、xterm 资产和保存走 `index.js` 的路由。保存接口有独立的路径校验与大小上限。
