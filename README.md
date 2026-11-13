@@ -17,6 +17,9 @@
 
 ## 能力
 
+- **多标签编辑**：每个打开的文件占一个标签，标签条可切换、关闭（含中键）与批量保存/关闭；切换标签前先落盘，未保存且有冲突时先确认放弃；切回标签会恢复滚动位置与选区。
+- **全工作区搜索与替换**：新增「搜索」页，支持字面/正则、区分大小写、整词与包含 glob；结果按文件分组，点结果打开文件并定位到行；「全部替换」与单文件替换都先确认，服务端逐文件校验（仅工作区内普通文本、≤ 2 MB、跳过二进制、拒 `.git`，最多 200 文件 / 5000 处）。
+- **快速打开与命令面板**：`Ctrl+P` 按名字模糊查找工作区文件（支持 `路径:行号` 直接跳行，输入 `>` 切到命令模式），`Ctrl+Shift+P` 打开命令面板，`Ctrl+Shift+F` 打开搜索页；这些键只在面板获得焦点时生效，嵌在面板里的终端仍把按键交给 shell。
 - **左侧文件树**：按工作区根目录懒加载（`remote.workspaceFiles.list`），默认隐藏 `.git`、`node_modules`、`dist` 等目录，可用标题栏的漏斗按钮显示；已修改/新增/删除/未跟踪文件带 `M`/`A`/`D`/`U` 角标。
 - **右侧文件内容**：`remote.workspaceFiles.read` 按行分页读取（一次最多 3,000 行，超出提示截断），带行号、横向滚动与轻量语法着色；标题前显示该文件的 Material 图标。
 - **语言渲染细化**：
@@ -50,7 +53,7 @@ https://github.com/material-extensions/vscode-material-icon-theme）的官方素
 
 | 半边 | 文件 | 职责 |
 |---|---|---|
-| Host | `index.js` | `/plugins/code-viewer` 路由：`/repo`、`/log`、`/commit`、`/status`、`/stat`、`POST /write`、`POST /mkdir`、`POST /touch`、`POST /rename`、`POST /delete`、`POST /copy`、`POST /reveal`、`/file`（图片）、`/asset`（xterm） |
+| Host | `index.js` | `/plugins/code-viewer` 路由：`/repo`、`/log`、`/commit`、`/status`、`/stat`、`/search`、`/files`、`POST /replace`、`POST /write`、`POST /mkdir`、`POST /touch`、`POST /rename`、`POST /delete`、`POST /copy`、`POST /reveal`、`/file`（图片）、`/asset`（xterm） |
 | Client | `client.js` | 右侧栏 tab 类型 + 面板 UI + 快捷键 + 引用桥接 |
 
 读取文件内容走 Harness 自带、按会话授权的 `remote.workspaceFiles`；仓库历史、图片、xterm 资产和保存走 `index.js` 的路由。保存接口有独立的路径校验与大小上限。
@@ -80,9 +83,21 @@ bundle；开发时可改用 `dsh plugin add link:<本仓库绝对路径>` 安装
 安装后刷新页面：右侧栏的 Guide 页会出现「CodeIDE」入口，或按面板提示里显示的那个键（桌面端默认
 `Cmd/Ctrl+L`，Web 端 `Cmd/Ctrl+Shift+L`）。
 
+## 自测
+
+不需要 DSH 宿主、不联网、不产生依赖：
+
+```sh
+node scripts/selftest.mjs
+```
+
+覆盖 `/search`、`/files`、`/replace` 的 helper 与 HTTP 分发（临时工作区夹具，含忽略目录、二进制与超大文件），并以桩模块加载器渲染面板的编辑器/搜索/命令面板几个主要状态。
+
 ## 已知边界
 
-- 暂存、提交、checkout、分支操作仍未实现；编辑只针对单个文本文件，不做多文件/多标签的编辑器。
+- 暂存、提交、checkout、分支操作仍未实现；多标签只在面板内存在，刷新页面后不会恢复，也不做分屏。
+- 替换只有「全部替换」与「单文件替换」，没有逐处跳过/逐个确认。
+- 搜索优先用系统 `rg`（因此尊重 `.gitignore`）；没有 `rg` 或调用失败时回退到内置 Node 走查，回退实现只按固定忽略目录跳过。
 - Markdown 渲染器是内置的轻量实现：支持标题/段落/粗斜体/删除线/行内代码/列表/引用/分隔线/链接/围栏代码块，不支持表格、脚注、原始 HTML、任务列表勾选与图片加载。
 - 命令行分栏优先用 **xterm.js** 渲染（`vendor/xterm.mjs`，随插件内置、按需加载，64 KiB gzip 左右），因此 `vim`、`top` 这类全屏 TUI 可用；只有浏览器环境缺少 `ResizeObserver`/`matchMedia` 或资产加载失败时才退回文本渲染（那时 TUI 显示不完整）。
 - xterm 资产由 `scripts/sync-xterm.mjs <@xterm/xterm 包目录>` 从已安装依赖同步，版本记录在 `vendor/VERSION`。

@@ -11,9 +11,11 @@
  *   +----------------+------------------------------+
  *
  * File reads ride the shipped, session-authorized `remote.workspaceFiles`
- * service. Git history rides this bundle's own read-only host route. One
- * shortcut opens the page when it is closed and, once it is open, inserts an
- * `@file` reference for the file on screen into the composer at the caret.
+ * service. Git history rides this bundle's own read-only host route, and its
+ * `/search`, `/files` and `/replace` endpoints back workspace search, quick
+ * open and replace-all. One shortcut opens the page when it is closed and,
+ * once it is open, inserts an `@file` reference for the file on screen into
+ * the composer at the caret.
  *
  * The bundle is plain JavaScript: React comes from the browser module table,
  * styles are component-owned CSS using only `--dsw-*` theme tokens, and no
@@ -161,6 +163,59 @@ window.__ModuleLoader__.load({
       'term.phase.failed': 'failed',
       'term.phase.unavailable': 'terminal unavailable',
       'term.retry': 'Retry',
+      'tab.search': 'Search',
+      'tab.close': 'Close this tab',
+      'tab.saveAll': 'Save all files',
+      'tab.closeAll': 'Close all tabs',
+      'action.palette': 'Quick open and command palette (Ctrl+P)',
+      'search.placeholder': 'Search in workspace',
+      'search.replacePlaceholder': 'Replace with',
+      'search.replaceShort': 'Replace',
+      'search.includeShort': 'Files',
+      'search.includePlaceholder': 'Glob, e.g. src/**, *.ts',
+      'search.case': 'Match case',
+      'search.regex': 'Use a regular expression',
+      'search.word': 'Match whole word',
+      'search.run': 'Search',
+      'search.replaceAll': 'Replace all',
+      'search.replaceOne': 'Replace every match in this file',
+      'search.replaceOneShort': 'Replace',
+      'search.replacing': 'Replacing…',
+      'search.loading': 'Searching…',
+      'search.idle': 'Type a query and press Enter',
+      'search.noResults': 'No results',
+      'search.error': 'Search failed',
+      'search.summary': '{count} matches in {files} files',
+      'search.truncated': 'Results are capped; refine the query.',
+      'search.confirmAll': 'Replace {count} matches in {files} files?',
+      'search.confirmFile': 'Replace every match in {path}?',
+      'search.report': 'Replaced {count} matches in {files} files.',
+      'search.reportSkipped': '{count} files were skipped.',
+      'search.idleHint': 'Enter searches, Esc returns to the editor',
+      'palette.filePlaceholder': 'Search files by name (type > for commands)',
+      'palette.commandPlaceholder': 'Type a command name',
+      'palette.commandHint': '↑↓ to move · Enter to run · Esc to close',
+      'palette.fileHint': 'Add {line} after a name to jump to that line',
+      'palette.loading': 'Loading the file index…',
+      'palette.noFile': 'No matching file',
+      'palette.noCommand': 'No matching command',
+      'palette.indexFailed': 'Could not read the file index',
+      'palette.enter': 'Enter',
+      'notice.savedAll': 'All files saved',
+      'command.quickOpen': 'Go to file…',
+      'command.search': 'Search in workspace',
+      'command.save': 'Save file',
+      'command.saveAll': 'Save all files',
+      'command.closeTab': 'Close tab',
+      'command.closeAll': 'Close all tabs',
+      'command.git': 'Show the Git graph',
+      'command.refresh': 'Reload the workspace',
+      'command.toggleIgnored': 'Toggle ignored folders',
+      'command.toggleTerminal': 'Toggle the command line',
+      'command.reference': 'Reference this file',
+      'command.copyPath': 'Copy relative path',
+      'command.reveal': 'Reveal in file manager',
+      'command.reloadFile': 'Reload this file',
     }
 
     const ZH = {
@@ -287,6 +342,59 @@ window.__ModuleLoader__.load({
       'term.phase.failed': '连接失败',
       'term.phase.unavailable': '终端不可用',
       'term.retry': '重试',
+      'tab.search': '搜索',
+      'tab.close': '关闭这个标签',
+      'tab.saveAll': '保存全部文件',
+      'tab.closeAll': '关闭全部标签',
+      'action.palette': '快速打开与命令面板（Ctrl+P）',
+      'search.placeholder': '在工作区中搜索',
+      'search.replacePlaceholder': '替换为',
+      'search.replaceShort': '替换',
+      'search.includeShort': '包含',
+      'search.includePlaceholder': 'glob，例如 src/**、*.ts',
+      'search.case': '区分大小写',
+      'search.regex': '使用正则表达式',
+      'search.word': '整词匹配',
+      'search.run': '搜索',
+      'search.replaceAll': '全部替换',
+      'search.replaceOne': '替换此文件中的全部匹配',
+      'search.replaceOneShort': '替换',
+      'search.replacing': '替换中…',
+      'search.loading': '搜索中…',
+      'search.idle': '输入查询后按回车',
+      'search.noResults': '没有结果',
+      'search.error': '搜索失败',
+      'search.summary': '{files} 个文件中共 {count} 处',
+      'search.truncated': '结果已截断，请缩小范围。',
+      'search.confirmAll': '在 {files} 个文件中替换 {count} 处？',
+      'search.confirmFile': '替换「{path}」中的全部匹配？',
+      'search.report': '已替换 {count} 处，涉及 {files} 个文件。',
+      'search.reportSkipped': '跳过 {count} 个文件。',
+      'search.idleHint': '回车搜索，Esc 返回编辑器',
+      'palette.filePlaceholder': '按名字搜索文件（输入 > 切到命令）',
+      'palette.commandPlaceholder': '输入命令名',
+      'palette.commandHint': '↑↓ 选择 · 回车执行 · Esc 关闭',
+      'palette.fileHint': '文件名后加 {line} 可直接跳到该行',
+      'palette.loading': '正在读取文件索引…',
+      'palette.noFile': '没有匹配的文件',
+      'palette.noCommand': '没有匹配的命令',
+      'palette.indexFailed': '文件索引读取失败',
+      'palette.enter': '回车',
+      'notice.savedAll': '全部已保存',
+      'command.quickOpen': '转到文件…',
+      'command.search': '在工作区搜索',
+      'command.save': '保存文件',
+      'command.saveAll': '保存全部文件',
+      'command.closeTab': '关闭标签',
+      'command.closeAll': '关闭全部标签',
+      'command.git': '查看 Git 图谱',
+      'command.refresh': '重新加载工作区',
+      'command.toggleIgnored': '切换忽略目录',
+      'command.toggleTerminal': '切换命令行',
+      'command.reference': '引用当前文件',
+      'command.copyPath': '复制相对路径',
+      'command.reveal': '在文件管理器中显示',
+      'command.reloadFile': '重新加载此文件',
     }
 
     const MONO = 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace'
@@ -533,6 +641,75 @@ window.__ModuleLoader__.load({
   background: var(--dsw-alias-bg-overlay); border: 1px solid var(--dsw-alias-border-l2);
   color: var(--dsw-alias-label-primary); font-size: 11px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18); }
 .dcv-error { color: var(--dsw-alias-state-error-primary); }
+.dcv-filesPane { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.dcv-tabbar { display: flex; align-items: stretch; border-bottom: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-base)); min-height: 27px; }
+.dcv-tabbarList { display: flex; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.dcv-tabItem { display: flex; align-items: center; gap: 4px; padding: 3px 4px 3px 8px; max-width: 210px;
+  border: none; border-right: 1px solid var(--dsw-alias-border-l1); background: transparent; cursor: pointer;
+  color: var(--dsw-alias-label-secondary); font-size: 11px; white-space: nowrap; }
+.dcv-tabItem:hover { background: var(--dsw-alias-bg-layer-2); }
+.dcv-tabItem.is-active { background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary);
+  box-shadow: inset 0 -2px 0 var(--dsw-alias-brand-primary); }
+.dcv-tabName { overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+.dcv-tabDirty { font-size: 9px; color: var(--dsw-alias-state-warn-primary); }
+.dcv-tabClose { display: inline-flex; align-items: center; border: none; background: transparent; padding: 1px;
+  border-radius: 4px; color: var(--dsw-alias-label-secondary); cursor: pointer; }
+.dcv-tabClose:hover { background: var(--dsw-alias-bg-layer-3); color: var(--dsw-alias-label-primary); }
+.dcv-tabbarActions { display: flex; align-items: center; gap: 1px; padding: 0 4px; flex: 0 0 auto; }
+.dcv-search { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.dcv-searchForm { padding: 6px 8px; border-bottom: 1px solid var(--dsw-alias-border-l1);
+  display: flex; flex-direction: column; gap: 4px; }
+.dcv-searchRow { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.dcv-searchLabel { flex: 0 0 auto; font-size: 10px; color: var(--dsw-alias-label-secondary); width: 30px; }
+.dcv-searchInput { flex: 1 1 auto; min-width: 0; border: 1px solid var(--dsw-alias-border-l1); border-radius: 4px;
+  background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-family: ${MONO};
+  font-size: 11px; padding: 3px 6px; outline: none; }
+.dcv-searchInput:focus { border-color: var(--dsw-alias-brand-primary); }
+.dcv-searchToggle { flex: 0 0 auto; border: 1px solid transparent; background: transparent; border-radius: 4px;
+  color: var(--dsw-alias-label-secondary); font-size: 10px; padding: 2px 4px; cursor: pointer; font-family: ${MONO}; }
+.dcv-searchToggle.is-on { border-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-brand-primary); }
+.dcv-searchAction { flex: 0 0 auto; border: 1px solid var(--dsw-alias-border-l1); background: transparent;
+  color: var(--dsw-alias-label-primary); border-radius: 4px; font-size: 10px; padding: 2px 6px; cursor: pointer; }
+.dcv-searchAction:disabled { opacity: 0.45; cursor: default; }
+.dcv-searchStatus { padding: 4px 8px; font-size: 10px; color: var(--dsw-alias-label-secondary); }
+.dcv-searchResults { flex: 1 1 auto; min-height: 0; overflow: auto; padding-bottom: 10px; }
+.dcv-searchFileGroup { border-bottom: 1px solid var(--dsw-alias-border-l1); }
+.dcv-searchFileHead { display: flex; align-items: center; gap: 5px; padding: 3px 8px;
+  background: var(--dsw-alias-bg-layer-2); }
+.dcv-searchFileName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; color: var(--dsw-alias-label-primary); direction: ltr; }
+.dcv-searchCount { flex: 0 0 auto; font-size: 10px; color: var(--dsw-alias-label-secondary); }
+.dcv-searchHit { display: flex; align-items: baseline; gap: 8px; width: 100%; border: none; background: transparent;
+  text-align: left; padding: 1px 8px 1px 12px; cursor: pointer; color: var(--dsw-alias-label-primary); }
+.dcv-searchHit:hover { background: var(--dsw-alias-bg-layer-2); }
+.dcv-searchHitNo { flex: 0 0 34px; text-align: right; font-family: ${MONO}; font-size: 10px;
+  color: var(--dsw-alias-label-secondary); opacity: 0.7; }
+.dcv-searchHitText { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre;
+  font-family: ${MONO}; font-size: 11px; }
+.dcv-report { font-size: 10px; }
+.dcv-reportSkipped { color: var(--dsw-alias-state-warn-primary); }
+.dcv-palette { position: absolute; inset: 0; z-index: 70; display: flex; justify-content: center;
+  align-items: flex-start; padding-top: 28px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) 45%, transparent); }
+.dcv-paletteBox { width: min(520px, 94%); max-height: 70%; display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 8px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-overlay);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); }
+.dcv-paletteHead { display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1); }
+.dcv-paletteInput { flex: 1 1 auto; min-width: 0; border: none; outline: none; background: transparent;
+  color: var(--dsw-alias-label-primary); font-size: 12px; font-family: ${MONO}; padding: 2px 0; }
+.dcv-paletteList { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 3px; }
+.dcv-paletteItem { display: flex; align-items: center; gap: 8px; width: 100%; border: none; border-radius: 5px;
+  background: transparent; color: var(--dsw-alias-label-primary); text-align: left; padding: 4px 7px;
+  cursor: pointer; font-size: 11.5px; }
+.dcv-paletteItem.is-active { background: var(--dsw-alias-bg-layer-3); }
+.dcv-paletteLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-family: ${MONO}; }
+.dcv-paletteKeys { flex: 0 0 auto; font-size: 10px; color: var(--dsw-alias-label-secondary); }
+.dcv-paletteEmpty { padding: 10px; font-size: 11px; color: var(--dsw-alias-label-secondary); text-align: center; }
+.dcv-paletteHint { border-top: 1px solid var(--dsw-alias-border-l1); padding: 3px 8px; font-size: 10px;
+  color: var(--dsw-alias-label-secondary); }
 `
 
     /* ------------------------------------------------------------------ icons */
@@ -597,6 +774,16 @@ window.__ModuleLoader__.load({
       h('path', { key: 'a', d: 'M4 5h16l-6 7v6l-4 2v-8z' }),
     ])
 
+    const IconSearch = icon([
+      h('circle', { key: 'a', cx: 11, cy: 11, r: 6 }),
+      h('path', { key: 'b', d: 'M20 20l-4.3-4.3' }),
+    ])
+    const IconSave = icon([
+      h('path', { key: 'a', d: 'M5 4h11l3 3v13H5z' }),
+      h('path', { key: 'b', d: 'M8 4v5h7V4' }),
+      h('path', { key: 'c', d: 'M8 20v-6h8v6' }),
+    ])
+
     /* ---------------------------------------------------------------- helpers */
 
     /** Last path segment. */
@@ -605,6 +792,44 @@ window.__ModuleLoader__.load({
       const clean = path.replace(/[\\/]+$/u, '')
       const cut = clean.lastIndexOf('/')
       return cut === -1 ? clean : clean.slice(cut + 1)
+    }
+
+    /**
+     * Fuzzy subsequence score for the quick-open palette: consecutive hits and
+     * hits at a path/camel boundary win. `null` means "does not match".
+     */
+    function fuzzyScore(query, text) {
+      const needle = String(query).toLowerCase()
+      const haystack = String(text).toLowerCase()
+      if (needle === '') return 0
+      let score = 0
+      let at = 0
+      let previous = -2
+      for (let index = 0; index < haystack.length && at < needle.length; index += 1) {
+        if (haystack[index] !== needle[at]) continue
+        score += index === previous + 1 ? 3 : 1
+        const before = index === 0 ? '/' : haystack[index - 1]
+        if (before === '/' || before === '_' || before === '-' || before === '.') score += 4
+        previous = index
+        at += 1
+      }
+      if (at !== needle.length) return null
+      return score - Math.min(haystack.length, 240) * 0.05
+    }
+
+    /** Split a quick-open query into its fuzzy part and an optional `:line`. */
+    function parsePathLine(raw) {
+      const value = String(raw === undefined || raw === null ? '' : raw)
+      const match = /^(.*?):(\d+)$/u.exec(value)
+      if (match === null) return { query: value, line: null }
+      return { query: match[1], line: Number(match[2]) }
+    }
+
+    /** The search panel's idle state. */
+    const EMPTY_SEARCH = {
+      status: 'idle', query: '', replacement: '', regex: false, caseSensitive: false,
+      word: false, include: '', files: [], totalMatches: 0, truncated: false,
+      engine: null, error: null, report: null, replacing: false, ranQuery: '',
     }
 
     /** `@path`, or `@"path with spaces"` — the composer's own mention grammar. */
@@ -2398,6 +2623,11 @@ window.__ModuleLoader__.load({
         const clipboardRef = useRef(null)
         const [diffMarks, setDiffMarks] = useState({})
         const [diffUntracked, setDiffUntracked] = useState(false)
+        const [tabs, setTabs] = useState([])
+        const [activeId, setActiveId] = useState(null)
+        const [searchState, setSearchState] = useState(EMPTY_SEARCH)
+        const [palette, setPalette] = useState(null)
+        const [fileIndex, setFileIndex] = useState({ status: 'idle', cwd: null, files: [], truncated: false, error: null })
         const editorRef = useRef(null)
         const gutterRef = useRef(null)
         const highlightRef = useRef(null)
@@ -2405,6 +2635,19 @@ window.__ModuleLoader__.load({
         const bodyRef = useRef(null)
         const alive = useRef(true)
         const abortRef = useRef(null)
+        const tabsRef = useRef([])
+        const activeIdRef = useRef(null)
+        const tabSeqRef = useRef(0)
+        const readSeqRef = useRef(0)
+        const savedTextRef = useRef(null)
+        const searchRef = useRef(searchState)
+        searchRef.current = searchState
+        const fileIndexRef = useRef(fileIndex)
+        fileIndexRef.current = fileIndex
+        const searchInputRef = useRef(null)
+        const lastInsideRef = useRef(false)
+        const openPaletteRef = useRef(() => undefined)
+        const openSearchRef = useRef(() => undefined)
 
         // Glyphs carry their own colors, and two of them have a light variant;
         // re-render when the shell flips the page theme.
@@ -2423,6 +2666,39 @@ window.__ModuleLoader__.load({
             alive.current = false
             if (controller !== null) controller.abort()
             abortRef.current = null
+          }
+        }, [])
+
+        // Panel-level keys: quick open, command palette and workspace search.
+        // Keys typed into the embedded terminal belong to its shell, so they are
+        // left alone; the panel must be visible and have been interacted with.
+        useEffect(() => {
+          const onPointer = (event) => {
+            lastInsideRef.current = panelRef.current !== null && panelRef.current.contains(event.target)
+          }
+          const onKeyDown = (event) => {
+            if (event.defaultPrevented || event.isComposing || event.repeat) return
+            if (!(event.ctrlKey || event.metaKey) || event.altKey) return
+            const root = panelRef.current
+            if (root === null || root === undefined || root.getClientRects().length === 0) return
+            const active = document.activeElement
+            if (!(root.contains(active) || lastInsideRef.current)) return
+            if (active !== null && typeof active.closest === 'function' && active.closest('.dcv-term') !== null) return
+            if (event.code === 'KeyP') {
+              event.preventDefault()
+              openPaletteRef.current(event.shiftKey ? 'commands' : 'files')
+              return
+            }
+            if (event.code === 'KeyF' && event.shiftKey) {
+              event.preventDefault()
+              openSearchRef.current()
+            }
+          }
+          window.addEventListener('pointerdown', onPointer, true)
+          window.addEventListener('keydown', onKeyDown, true)
+          return () => {
+            window.removeEventListener('pointerdown', onPointer, true)
+            window.removeEventListener('keydown', onKeyDown, true)
           }
         }, [])
 
@@ -2587,6 +2863,13 @@ window.__ModuleLoader__.load({
           setGraph({ status: 'idle' })
           setCommit({ status: 'idle' })
           setStatusFiles([])
+          setTabs([])
+          tabsRef.current = []
+          setActiveId(null)
+          activeIdRef.current = null
+          setSearchState(EMPTY_SEARCH)
+          setPalette(null)
+          setFileIndex({ status: 'idle', cwd: null, files: [], truncated: false, error: null })
           if (typeof cwd !== 'string' || cwd === '') { setRepo({ status: 'noWorkspace' }); return }
           void loadDir('')
           void loadRepo(cwd)
@@ -2597,32 +2880,135 @@ window.__ModuleLoader__.load({
         saveStateRef.current = saveState
         dirtyRef.current = doc.status === 'ready' && doc.image !== true && editText !== (typeof doc.text === 'string' ? doc.text : '')
 
-        const openFile = useCallback(async (path) => {
-          if (dirtyRef.current && selected !== null && selected.path !== path) {
-            if (saveStateRef.current === 'conflict' || saveStateRef.current === 'error') {
-              const discard = typeof window.confirm === 'function' ? window.confirm(t('edit.discardConfirm')) : true
-              if (!discard) return
-            } else {
-              await saveFileRef.current(false)
-            }
+        /** Replace the tab list and keep its synchronous mirror in step. */
+        const commitTabs = useCallback((next) => {
+          tabsRef.current = next
+          setTabs(next)
+        }, [])
+
+        /** Everything one tab must remember while another one is on screen. */
+        const captureActive = useCallback(() => {
+          if (selected === null) return null
+          const area = editorRef.current
+          // A save that finished after this render has not been painted yet; fold
+          // its answer in so the tab is stored as saved, not as dirty.
+          const saved = savedTextRef.current
+          const settled = saved !== null && saved.path === selected.path && saved.text === editText
+            && doc.status === 'ready' && saveState !== 'conflict' && saveState !== 'error'
+          const snapshotDoc = settled
+            ? { ...doc, text: editText, bytes: saved.bytes === undefined ? doc.bytes : saved.bytes }
+            : doc
+          return {
+            path: selected.path,
+            doc: snapshotDoc, editText, editMtime,
+            saveState: settled ? 'saved' : saveState,
+            saveMessage: settled ? null : saveMessage,
+            preview, jsonPretty, imageInfo,
+            diffMarks, diffUntracked,
+            scrollTop: area === null ? 0 : area.scrollTop,
+            selStart: area === null ? null : area.selectionStart,
+            selEnd: area === null ? null : area.selectionEnd,
           }
+        }, [selected, doc, editText, editMtime, saveState, saveMessage, preview, jsonPretty, imageInfo, diffMarks, diffUntracked])
+
+        /** Store the active tab's snapshot (its path may have been renamed). */
+        const persistActive = useCallback((snapshot) => {
+          const id = activeIdRef.current
+          if (snapshot === null || id === null) return
+          commitTabs(tabsRef.current.map(tab => (tab.id === id
+            ? { ...tab, path: snapshot.path, name: baseName(snapshot.path), snapshot }
+            : tab)))
+        }, [commitTabs])
+
+        /** Clear the page that remains after the last tab closes. */
+        const resetDocState = useCallback(() => {
+          readSeqRef.current += 1
+          setSelected(null)
+          setDoc({ status: 'idle' })
+          setEditText('')
+          setEditMtime(null)
+          setSaveState('idle')
+          setSaveMessage(null)
+          setPreview(false)
+          setJsonPretty(true)
+          setImageInfo(null)
+          setDiffMarks({})
+          setDiffUntracked(false)
+        }, [])
+
+        /** Put one tab's snapshot back on screen. */
+        const applySnapshot = useCallback((snapshot) => {
+          readSeqRef.current += 1
+          setSelected({ path: snapshot.path, name: baseName(snapshot.path) })
+          setDoc(snapshot.doc)
+          setEditText(snapshot.editText)
+          setEditMtime(snapshot.editMtime)
+          setSaveState(snapshot.saveState)
+          setSaveMessage(snapshot.saveMessage)
+          setPreview(snapshot.preview === true)
+          setJsonPretty(snapshot.jsonPretty !== false)
+          setImageInfo(snapshot.imageInfo === undefined ? null : snapshot.imageInfo)
+          setDiffMarks(snapshot.diffMarks === undefined ? {} : snapshot.diffMarks)
+          setDiffUntracked(snapshot.diffUntracked === true)
+          requestAnimationFrame(() => {
+            const area = editorRef.current
+            if (area === null) return
+            area.scrollTop = snapshot.scrollTop === undefined ? 0 : snapshot.scrollTop
+            if (snapshot.selStart !== null && snapshot.selEnd !== null) {
+              try { area.setSelectionRange(snapshot.selStart, snapshot.selEnd) } catch (_noSelection) { /* not always selectable */ }
+            }
+          })
+        }, [])
+
+        /** Save the visible buffer when needed; false means "do not leave it". */
+        const flushActive = useCallback(async () => {
+          if (!dirtyRef.current) return true
+          if (saveStateRef.current === 'conflict' || saveStateRef.current === 'error') {
+            return typeof window.confirm !== 'function' ? true : window.confirm(t('edit.discardConfirm'))
+          }
+          const saved = await saveFileRef.current(false)
+          if (saved) return true
+          return typeof window.confirm !== 'function' ? true : window.confirm(t('edit.discardConfirm'))
+        }, [t])
+
+        /** Move the caret to one 1-based line and scroll it into view. */
+        const focusLine = useCallback((line) => {
+          const area = editorRef.current
+          if (area === null || typeof line !== 'number' || !Number.isFinite(line)) return
+          const text = area.value
+          let start = 0
+          for (let index = 1; index < line; index += 1) {
+            const next = text.indexOf('\n', start)
+            if (next === -1) { start = text.length; break }
+            start = next + 1
+          }
+          const stop = text.indexOf('\n', start)
+          area.focus()
+          try { area.setSelectionRange(start, stop === -1 ? text.length : stop) } catch (_noSelection) { /* not editable */ }
+          area.scrollTop = Math.max(0, (line - 2) * 17)
+        }, [])
+
+        /** Load one file into the active tab (also used by "reload"). */
+        const readIntoActive = useCallback(async (path, line) => {
+          const token = readSeqRef.current + 1
+          readSeqRef.current = token
           setPreview(false)
           setEditText('')
           setEditMtime(null)
           setSaveState('idle')
           setSaveMessage(null)
           setSelected({ path, name: baseName(path) })
-          setMode('files')
-          setCommit({ status: 'idle' })
           setImageInfo(null)
+          setDiffMarks({})
+          setDiffUntracked(false)
+          setDoc({ status: 'loading', path })
           if (isImagePath(path)) {
             setDoc({ status: 'ready', path, image: true, text: '', lines: 0, eof: true, bytes: 0 })
             return
           }
-          setDoc({ status: 'loading', path })
           try {
             const result = await withTimeout(readRemote(joinPath(cwd, path)), 15000)
-            if (!alive.current) return
+            if (!alive.current || readSeqRef.current !== token) return
             const value = result.ok === true ? result.value : undefined
             if (value === undefined || value === null || typeof value.text !== 'string') {
               setDoc({
@@ -2638,17 +3024,115 @@ window.__ModuleLoader__.load({
               eof: value.eof !== false, bytes,
             })
             setEditText(text)
+            savedTextRef.current = null
             void loadDiff(path)
             if (typeof bytes === 'number' && bytes <= EDIT_LIMIT) {
               void apiGet('/stat', { path: cwd, rel: path }).then((info) => {
-                if (alive.current) setEditMtime(typeof info.mtime === 'number' ? info.mtime : null)
-              }).catch(() => { if (alive.current) setEditMtime(null) })
+                if (alive.current && readSeqRef.current === token) setEditMtime(typeof info.mtime === 'number' ? info.mtime : null)
+              }).catch(() => { if (alive.current && readSeqRef.current === token) setEditMtime(null) })
+            }
+            if (typeof line === 'number') {
+              requestAnimationFrame(() => requestAnimationFrame(() => { if (alive.current) focusLine(line) }))
             }
           } catch (error) {
-            if (!alive.current) return
+            if (!alive.current || readSeqRef.current !== token) return
             setDoc({ status: 'error', path, error: { code: 'exception', message: error instanceof Error ? error.message : String(error) } })
           }
-        }, [cwd, readRemote])
+        }, [cwd, readRemote, focusLine])
+
+        /** Switch to one tab, flushing the buffer that is on screen first. */
+        const activateTab = useCallback(async (id, line) => {
+          if (id === activeIdRef.current) {
+            if (typeof line === 'number') requestAnimationFrame(() => focusLine(line))
+            return
+          }
+          const target = tabsRef.current.find(tab => tab.id === id)
+          if (target === undefined) return
+          if (!(await flushActive())) return
+          persistActive(captureActive())
+          setActiveId(id)
+          activeIdRef.current = id
+          applySnapshot(target.snapshot)
+          // A tab hidden while it was still loading has no in-flight request any
+          // more; re-read it instead of leaving the loading state on screen.
+          if (target.snapshot.doc !== undefined && target.snapshot.doc.status === 'loading') {
+            void readIntoActive(target.path, line)
+            return
+          }
+          if (typeof line === 'number') {
+            requestAnimationFrame(() => requestAnimationFrame(() => focusLine(line)))
+          }
+        }, [applySnapshot, captureActive, flushActive, focusLine, persistActive, readIntoActive])
+
+        /** Open a file: reuse its tab, or create one after flushing the current. */
+        const openFile = useCallback(async (path, options) => {
+          const line = options !== undefined && options !== null && typeof options.line === 'number' ? options.line : undefined
+          const existing = tabsRef.current.find(tab => tab.path === path)
+          if (existing !== undefined) {
+            await activateTab(existing.id, line)
+            return
+          }
+          if (!(await flushActive())) return
+          persistActive(captureActive())
+          const id = tabSeqRef.current + 1
+          tabSeqRef.current = id
+          const snapshot = {
+            path,
+            doc: { status: 'loading', path },
+            editText: '', editMtime: null, saveState: 'idle', saveMessage: null,
+            preview: false, jsonPretty: true, imageInfo: null,
+            diffMarks: {}, diffUntracked: false,
+            scrollTop: 0, selStart: null, selEnd: null,
+          }
+          commitTabs([...tabsRef.current, { id, path, name: baseName(path), snapshot }])
+          setActiveId(id)
+          activeIdRef.current = id
+          setMode('files')
+          setCommit({ status: 'idle' })
+          await readIntoActive(path, line)
+        }, [activateTab, captureActive, commitTabs, flushActive, persistActive, readIntoActive])
+
+        /** Close one tab, picking its neighbour when it was the visible one. */
+        const closeTab = useCallback(async (id) => {
+          const index = tabsRef.current.findIndex(tab => tab.id === id)
+          if (index === -1) return
+          if (id === activeIdRef.current) {
+            if (!(await flushActive())) return
+            const next = tabsRef.current.filter(tab => tab.id !== id)
+            commitTabs(next)
+            const neighbour = next[Math.min(index, next.length - 1)]
+            if (neighbour === undefined) {
+              setActiveId(null)
+              activeIdRef.current = null
+              resetDocState()
+              return
+            }
+            setActiveId(neighbour.id)
+            activeIdRef.current = neighbour.id
+            applySnapshot(neighbour.snapshot)
+            return
+          }
+          commitTabs(tabsRef.current.filter(tab => tab.id !== id))
+        }, [applySnapshot, commitTabs, flushActive, resetDocState])
+
+        /** Close every tab (after flushing the one on screen). */
+        const closeAllTabs = useCallback(async () => {
+          if (tabsRef.current.length === 0) return
+          if (!(await flushActive())) return
+          commitTabs([])
+          setActiveId(null)
+          activeIdRef.current = null
+          resetDocState()
+        }, [commitTabs, flushActive, resetDocState])
+
+        /** Save the visible buffer; background tabs are flushed on switch already. */
+        const saveAll = useCallback(async () => {
+          if (dirtyRef.current) {
+            const saved = await saveFileRef.current(false)
+            if (!saved) return
+          }
+          setNotice(t('notice.savedAll'))
+        }, [t])
 
         const stateRef = useRef({ path: null })
         stateRef.current.path = selected === null ? null : selected.path
@@ -2696,15 +3180,17 @@ window.__ModuleLoader__.load({
           else setNotice(t('notice.failed'))
         }, [sessionId, inputActions, t])
 
-        const reload = useCallback(() => {
+        const reload = useCallback(async () => {
           setStatusFiles([])
           void loadRepo(cwd)
           setDirs({})
           void loadDir('')
           setGraph({ status: 'idle' })
           setCommit({ status: 'idle' })
-          if (selected !== null) void openFile(selected.path)
-        }, [cwd, loadRepo, loadDir, openFile, selected])
+          if (selected === null) return
+          if (!(await flushActive())) return
+          await readIntoActive(selected.path)
+        }, [cwd, loadRepo, loadDir, readIntoActive, selected, flushActive])
 
         // Opening the Git page reads history once; the tab switch also asks for it.
         useEffect(() => {
@@ -2874,7 +3360,7 @@ window.__ModuleLoader__.load({
           if (typeof cwd !== 'string' || cwd === '') return
           try {
             const data = await apiGet('/fileDiff', { path: cwd, rel: path })
-            if (!alive.current) return
+            if (!alive.current || stateRef.current.path !== path) return
             if (data === null || data === undefined || data.repo === false) {
               setDiffUntracked(false)
               setDiffMarks({})
@@ -2898,9 +3384,9 @@ window.__ModuleLoader__.load({
 
         /** Save the buffer; `force` skips the mtime check after a 409. */
         const saveFile = useCallback(async (force) => {
-          if (selected === null || doc.status !== 'ready' || doc.image === true) return
-          if (savingRef.current) return
-          if (force !== true && editMtime !== null && editText === doc.text) return
+          if (selected === null || doc.status !== 'ready' || doc.image === true) return true
+          if (savingRef.current) return false
+          if (force !== true && editMtime !== null && editText === doc.text) return true
           savingRef.current = true
           setSaveState('saving')
           setSaveMessage(null)
@@ -2912,9 +3398,15 @@ window.__ModuleLoader__.load({
             setEditMtime(typeof saved.mtime === 'number' ? saved.mtime : null)
             setDoc({ ...doc, text: editText, bytes: typeof saved.bytes === 'number' ? saved.bytes : doc.bytes })
             setSaveState('saved')
+            savedTextRef.current = {
+              path: selected.path,
+              text: editText,
+              bytes: typeof saved.bytes === 'number' ? saved.bytes : undefined,
+            }
             void loadDiff(selected.path)
+            return true
           } catch (error) {
-            if (!alive.current) return
+            if (!alive.current) return false
             if (error !== null && error !== undefined && error.status === 409) {
               setSaveState('conflict')
               setSaveMessage(t('edit.conflict'))
@@ -2922,6 +3414,7 @@ window.__ModuleLoader__.load({
               setSaveState('error')
               setSaveMessage(error instanceof Error ? error.message : String(error))
             }
+            return false
           } finally {
             savingRef.current = false
           }
@@ -3014,6 +3507,7 @@ window.__ModuleLoader__.load({
             await apiPost(operation, payload, { path: cwd })
             if (typeof dir === 'string') void loadDir(dir)
             void refreshStatus(cwd)
+            setFileIndex(previous => ({ ...previous, status: 'idle', cwd: null }))
             return true
           } catch (failure) {
             flash(`${t('menu.failed')}: ${failure instanceof Error ? failure.message : String(failure)}`)
@@ -3033,8 +3527,22 @@ window.__ModuleLoader__.load({
           if (/[\\/]/u.test(name) || name === '.' || name === '..' || name === '') { flash(t('menu.invalidName')); return }
           const dir = parentOfPath(from)
           if (!(await runOperation('/rename', { rel: from, name }, dir))) return
+          const nextBase = dir === '' ? name : `${dir}/${name}`
+          const rewrite = (value) => (value === from
+            ? nextBase
+            : (value.startsWith(`${from}/`) ? `${nextBase}${value.slice(from.length)}` : value))
+          commitTabs(tabsRef.current.map(tab => ((tab.path === from || tab.path.startsWith(`${from}/`))
+            ? (() => {
+              const path = rewrite(tab.path)
+              return { ...tab, path, name: baseName(path), snapshot: { ...tab.snapshot, path } }
+            })()
+            : tab)))
           if (selected !== null && (selected.path === from || selected.path.startsWith(`${from}/`))) {
-            void openFile(dir === '' ? name : `${dir}/${name}`)
+            const path = rewrite(selected.path)
+            setSelected({ path, name: baseName(path) })
+            setDoc(previous => ({ ...previous, path }))
+            savedTextRef.current = null
+            stateRef.current.path = path
           }
         }
 
@@ -3042,10 +3550,22 @@ window.__ModuleLoader__.load({
           const confirmed = typeof window.confirm === 'function' ? window.confirm(t('menu.deleteConfirm', { path: rel })) : true
           if (!confirmed) return
           if (!(await runOperation('/delete', { rel }, parentOfPath(rel)))) return
-          if (selected !== null && (selected.path === rel || selected.path.startsWith(`${rel}/`))) {
-            setSelected(null)
-            setDoc({ status: 'idle' })
+          const victims = tabsRef.current.filter(tab => tab.path === rel || tab.path.startsWith(`${rel}/`))
+          if (victims.length === 0) return
+          const removedActive = victims.some(tab => tab.id === activeIdRef.current)
+          const survivors = tabsRef.current.filter(tab => !(tab.path === rel || tab.path.startsWith(`${rel}/`)))
+          commitTabs(survivors)
+          if (!removedActive) return
+          const neighbour = survivors[survivors.length - 1]
+          if (neighbour === undefined) {
+            setActiveId(null)
+            activeIdRef.current = null
+            resetDocState()
+            return
           }
+          setActiveId(neighbour.id)
+          activeIdRef.current = neighbour.id
+          applySnapshot(neighbour.snapshot)
         }
 
         const copyEntry = (rel, cut) => {
@@ -3219,6 +3739,190 @@ window.__ModuleLoader__.load({
             }))
         }
 
+        /* -------------------------------------------------------------- search */
+
+        const patchSearch = useCallback((patch) => {
+          setSearchState(previous => ({ ...previous, ...patch }))
+        }, [])
+
+        const runSearch = useCallback(async () => {
+          const current = searchRef.current
+          if (typeof cwd !== 'string' || cwd === '') return
+          if (current.query.trim() === '') {
+            patchSearch({ status: 'idle', files: [], totalMatches: 0, error: null, report: null, ranQuery: '' })
+            return
+          }
+          patchSearch({ status: 'loading', error: null, report: null })
+          try {
+            const data = await apiGet('/search', {
+              path: cwd,
+              q: current.query,
+              regex: current.regex ? '1' : '0',
+              case: current.caseSensitive ? '1' : '0',
+              word: current.word ? '1' : '0',
+              include: current.include,
+              max: '2000',
+            })
+            if (!alive.current) return
+            patchSearch({
+              status: 'ready',
+              files: Array.isArray(data.files) ? data.files : [],
+              totalMatches: Number(data.totalMatches) || 0,
+              truncated: data.truncated === true,
+              engine: data.engine === undefined ? null : data.engine,
+              ranQuery: current.query,
+            })
+          } catch (error) {
+            if (alive.current) patchSearch({
+              status: 'error',
+              error: error instanceof Error ? error.message : String(error),
+              files: [], totalMatches: 0, ranQuery: '',
+            })
+          }
+        }, [cwd, patchSearch])
+
+        const openSearch = useCallback(() => {
+          setMode('search')
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (searchInputRef.current !== null && searchInputRef.current !== undefined) searchInputRef.current.focus()
+          }))
+        }, [])
+
+        // Keep results in step with the inputs once the user pauses typing.
+        useEffect(() => {
+          if (mode !== 'search' || searchState.query.trim() === '') return undefined
+          const handle = setTimeout(() => { void runSearch() }, 450)
+          return () => { clearTimeout(handle) }
+        }, [mode, searchState.query, searchState.regex, searchState.caseSensitive, searchState.word, searchState.include, runSearch])
+
+        /** Replace every match of the last executed search, or one file's matches. */
+        const replaceMatches = useCallback(async (file) => {
+          const current = searchRef.current
+          if (typeof cwd !== 'string' || cwd === '' || current.ranQuery === '') return
+          const confirmText = file === undefined
+            ? t('search.confirmAll', { count: current.totalMatches, files: current.files.length })
+            : t('search.confirmFile', { path: file })
+          if (typeof window.confirm === 'function' && !window.confirm(confirmText)) return
+          patchSearch({ replacing: true, report: null })
+          try {
+            const body = {
+              q: current.ranQuery,
+              replacement: current.replacement,
+              regex: current.regex,
+              case: current.caseSensitive,
+              word: current.word,
+              include: current.include,
+            }
+            if (file !== undefined) body.file = file
+            const data = await apiPost('/replace', body, { path: cwd })
+            if (!alive.current) return
+            patchSearch({
+              replacing: false,
+              report: {
+                changed: Array.isArray(data.changed) ? data.changed : [],
+                skipped: Array.isArray(data.skipped) ? data.skipped : [],
+                total: Number(data.totalReplacements) || 0,
+                truncated: data.truncated === true,
+              },
+            })
+            void loadRepo(cwd)
+            void runSearch()
+            const touched = (Array.isArray(data.changed) ? data.changed : []).some(entry => entry.rel === stateRef.current.path)
+            if (touched && !dirtyRef.current && stateRef.current.path !== null) void readIntoActive(stateRef.current.path)
+          } catch (error) {
+            if (alive.current) {
+              patchSearch({ replacing: false })
+              setNotice(`${t('search.error')}: ${error instanceof Error ? error.message : String(error)}`)
+            }
+          }
+        }, [cwd, t, patchSearch, runSearch, loadRepo, readIntoActive])
+
+        /* ------------------------------------------------------------- palette */
+
+        const ensureFileIndex = useCallback(async (force) => {
+          if (typeof cwd !== 'string' || cwd === '') return
+          const current = fileIndexRef.current
+          if (!force && current.cwd === cwd && (current.status === 'ready' || current.status === 'loading')) return
+          setFileIndex({ status: 'loading', cwd, files: [], truncated: false, error: null })
+          try {
+            const data = await apiGet('/files', { path: cwd, max: '50000' })
+            if (!alive.current) return
+            setFileIndex({
+              status: 'ready', cwd,
+              files: Array.isArray(data.files) ? data.files : [],
+              truncated: data.truncated === true,
+              error: null,
+            })
+          } catch (error) {
+            if (alive.current) setFileIndex({
+              status: 'error', cwd, files: [], truncated: false,
+              error: error instanceof Error ? error.message : String(error),
+            })
+          }
+        }, [cwd])
+
+        const openPalette = useCallback((kind) => {
+          setPalette({ mode: kind, query: '', index: 0 })
+          if (kind === 'files') void ensureFileIndex(false)
+        }, [ensureFileIndex])
+
+        openPaletteRef.current = openPalette
+        openSearchRef.current = openSearch
+
+        const paletteCommands = useMemo(() => {
+          const hasFile = selected !== null
+          return [
+            { id: 'open', label: t('command.quickOpen'), hint: 'Ctrl+P', run: () => { openPalette('files') } },
+            { id: 'search', label: t('command.search'), hint: 'Ctrl+Shift+F', run: () => { openSearch() } },
+            { id: 'save', label: t('command.save'), hint: 'Ctrl+S', disabled: !hasFile, run: () => { void saveFileRef.current(false) } },
+            { id: 'saveAll', label: t('command.saveAll'), disabled: tabs.length === 0, run: () => { void saveAll() } },
+            { id: 'close', label: t('command.closeTab'), disabled: !hasFile, run: () => { if (activeIdRef.current !== null) void closeTab(activeIdRef.current) } },
+            { id: 'closeAll', label: t('command.closeAll'), disabled: tabs.length === 0, run: () => { void closeAllTabs() } },
+            { id: 'reloadFile', label: t('command.reloadFile'), disabled: !hasFile, run: () => { if (selected !== null) void readIntoActive(selected.path) } },
+            { id: 'git', label: t('command.git'), run: () => { setMode('graph'); setCommit({ status: 'idle' }); if (graph.status === 'error') void loadGraph(cwd) } },
+            { id: 'refresh', label: t('command.refresh'), run: () => { reload() } },
+            { id: 'ignored', label: t('command.toggleIgnored'), run: () => { setShowIgnored(value => !value) } },
+            { id: 'terminal', label: t('command.toggleTerminal'), run: () => { setTermOpen(value => !value) } },
+            { id: 'reference', label: t('command.reference'), disabled: !hasFile, run: () => { referencedNow() } },
+            { id: 'copyPath', label: t('command.copyPath'), disabled: !hasFile, run: () => { if (selected !== null) void writeClipboard(selected.path) } },
+            { id: 'reveal', label: t('command.reveal'), disabled: !hasFile, run: () => { if (selected !== null) void revealPath(selected.path) } },
+          ].filter(command => command.disabled !== true)
+        }, [t, selected, tabs.length, graph.status, cwd, openPalette, openSearch, saveAll, closeTab, closeAllTabs,
+          readIntoActive, reload, referencedNow, writeClipboard, revealPath, loadGraph])
+
+        const paletteItems = useMemo(() => {
+          if (palette === null) return []
+          if (palette.mode === 'commands') {
+            const needle = palette.query.trim()
+            const matched = needle === ''
+              ? paletteCommands
+              : paletteCommands.filter(command => fuzzyScore(needle, command.label) !== null)
+            return matched.slice(0, 50)
+          }
+          if (fileIndex.status !== 'ready') return []
+          const { query } = parsePathLine(palette.query)
+          if (query === '') return fileIndex.files.slice(0, 50).map(path => ({ path }))
+          const scored = []
+          for (const path of fileIndex.files) {
+            const score = fuzzyScore(query, path)
+            if (score !== null) scored.push({ path, score })
+          }
+          scored.sort((left, right) => right.score - left.score)
+          return scored.slice(0, 50)
+        }, [palette, paletteCommands, fileIndex])
+
+        const runPaletteItem = useCallback((item) => {
+          if (palette === null || item === undefined || item === null) return
+          const mode = palette.mode
+          const parsed = mode === 'files' ? parsePathLine(palette.query) : { line: null }
+          setPalette(null)
+          if (mode === 'commands') {
+            if (typeof item.run === 'function') item.run()
+            return
+          }
+          void openFile(item.path, parsed.line === null ? undefined : { line: parsed.line })
+        }, [palette, openFile])
+
         /**
          * The in-place editor: a gutter, a syntax-highlighted backdrop and a
          * transparent textarea on top, so typing shows coloured code like the
@@ -3274,7 +3978,7 @@ window.__ModuleLoader__.load({
                   : null,
                 h('button', {
                   type: 'button', className: 'dcv-tab',
-                  onClick: () => { void openFile(selected.path) },
+                  onClick: () => { if (selected !== null) void readIntoActive(selected.path) },
                 }, t('edit.reload')))
               : null,
             h('div', { className: 'dcv-editor' },
@@ -3367,7 +4071,7 @@ window.__ModuleLoader__.load({
               detail === '' ? null : h('p', { className: 'dcv-hint' }, detail),
               h('button', {
                 type: 'button', className: 'dcv-retry',
-                onClick: () => { if (selected !== null) void openFile(selected.path) },
+                onClick: () => { if (selected !== null) void readIntoActive(selected.path) },
               }, t('action.retry')))
           }
           if (doc.image === true) {
@@ -3453,6 +4157,220 @@ window.__ModuleLoader__.load({
             rendered
               ? h('div', { className: 'dcv-mdScroll' }, h(MarkdownView, { key: 'md', text: doc.text }))
               : h('div', { className: 'dcv-code' }, lines))
+        }
+
+        /** The strip of open files below the header. */
+        function renderTabBar() {
+          if (tabs.length === 0) return null
+          return h('div', { className: 'dcv-tabbar' },
+            h('div', { className: 'dcv-tabbarList', role: 'tablist' }, tabs.map(tab => {
+              const active = tab.id === activeId
+              const dirty = active && dirtyRef.current
+              return h('div', {
+                key: tab.id,
+                className: 'dcv-tabItem' + (active ? ' is-active' : ''),
+                role: 'tab',
+                tabIndex: 0,
+                'aria-selected': active ? 'true' : 'false',
+                title: tab.path,
+                onClick: () => { void activateTab(tab.id) },
+                onAuxClick: (event) => { if (event.button === 1) { event.preventDefault(); void closeTab(tab.id) } },
+                onKeyDown: (event) => {
+                  if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void activateTab(tab.id) }
+                },
+              },
+              h(MaterialIcon, { name: tab.name, size: 13 }),
+              h('span', { className: 'dcv-tabName' }, tab.name),
+              dirty ? h('span', { className: 'dcv-tabDirty', title: t('edit.unsaved') }, '\u25cf') : null,
+              h('button', {
+                type: 'button', className: 'dcv-tabClose', title: t('tab.close'), 'aria-label': t('tab.close'),
+                onClick: (event) => { event.stopPropagation(); void closeTab(tab.id) },
+              }, h(IconClose, { size: 11 })))
+            })),
+            h('div', { className: 'dcv-tabbarActions' },
+              h('button', {
+                type: 'button', className: 'dcv-tool dcv-mini', title: t('tab.saveAll'), 'aria-label': t('tab.saveAll'),
+                onClick: () => { void saveAll() },
+              }, h(IconSave, { size: 13 })),
+              h('button', {
+                type: 'button', className: 'dcv-tool dcv-mini', title: t('tab.closeAll'), 'aria-label': t('tab.closeAll'),
+                onClick: () => { void closeAllTabs() },
+              }, h(IconClose, { size: 13 }))))
+        }
+
+        /** One replacement outcome line. */
+        function renderReplaceReport(report) {
+          const changed = Array.isArray(report.changed) ? report.changed : []
+          const skipped = Array.isArray(report.skipped) ? report.skipped : []
+          return h('span', { className: 'dcv-report' },
+            h('span', null, t('search.report', { count: report.total, files: changed.length })),
+            skipped.length === 0 ? null : h('span', { className: 'dcv-reportSkipped' }, ` ${t('search.reportSkipped', { count: skipped.length })}`))
+        }
+
+        /** Workspace search and replace. */
+        function renderSearchPane() {
+          const state = searchState
+          const status = state.status === 'loading'
+            ? t('search.loading')
+            : state.status === 'error'
+              ? `${t('search.error')}: ${state.error === null ? '' : state.error}`
+              : state.status === 'ready'
+                ? (state.totalMatches === 0 ? t('search.noResults') : t('search.summary', { files: state.files.length, count: state.totalMatches }))
+                : t('search.idle')
+          return h('div', { key: 'search', className: 'dcv-search' },
+            h('div', { className: 'dcv-searchForm' },
+              h('div', { className: 'dcv-searchRow' },
+                h(IconSearch, { size: 13 }),
+                h('input', {
+                  ref: searchInputRef,
+                  className: 'dcv-searchInput',
+                  placeholder: t('search.placeholder'),
+                  value: state.query,
+                  spellCheck: false,
+                  'aria-label': t('search.placeholder'),
+                  onChange: (event) => { patchSearch({ query: event.target.value }) },
+                  onKeyDown: (event) => {
+                    if (event.key === 'Enter') { event.preventDefault(); void runSearch(); return }
+                    if (event.key === 'Escape') { event.preventDefault(); setMode('files') }
+                  },
+                }),
+                h('button', {
+                  type: 'button', className: 'dcv-searchToggle' + (state.caseSensitive ? ' is-on' : ''),
+                  title: t('search.case'), 'aria-pressed': state.caseSensitive,
+                  onClick: () => { patchSearch({ caseSensitive: !state.caseSensitive }) },
+                }, 'Aa'),
+                h('button', {
+                  type: 'button', className: 'dcv-searchToggle' + (state.regex ? ' is-on' : ''),
+                  title: t('search.regex'), 'aria-pressed': state.regex,
+                  onClick: () => { patchSearch({ regex: !state.regex }) },
+                }, '.*'),
+                h('button', {
+                  type: 'button', className: 'dcv-searchToggle' + (state.word ? ' is-on' : ''),
+                  title: t('search.word'), 'aria-pressed': state.word,
+                  onClick: () => { patchSearch({ word: !state.word }) },
+                }, 'W')),
+              h('div', { className: 'dcv-searchRow' },
+                h('span', { className: 'dcv-searchLabel' }, t('search.replaceShort')),
+                h('input', {
+                  className: 'dcv-searchInput',
+                  placeholder: t('search.replacePlaceholder'),
+                  value: state.replacement,
+                  spellCheck: false,
+                  'aria-label': t('search.replacePlaceholder'),
+                  onChange: (event) => { patchSearch({ replacement: event.target.value }) },
+                  onKeyDown: (event) => { if (event.key === 'Enter') { event.preventDefault(); void replaceMatches() } },
+                }),
+                h('button', {
+                  type: 'button', className: 'dcv-searchAction',
+                  disabled: state.replacing || state.status !== 'ready' || state.totalMatches === 0,
+                  onClick: () => { void replaceMatches() },
+                }, state.replacing ? t('search.replacing') : t('search.replaceAll'))),
+              h('div', { className: 'dcv-searchRow' },
+                h('span', { className: 'dcv-searchLabel' }, t('search.includeShort')),
+                h('input', {
+                  className: 'dcv-searchInput',
+                  placeholder: t('search.includePlaceholder'),
+                  value: state.include,
+                  spellCheck: false,
+                  'aria-label': t('search.includePlaceholder'),
+                  onChange: (event) => { patchSearch({ include: event.target.value }) },
+                  onKeyDown: (event) => { if (event.key === 'Enter') { event.preventDefault(); void runSearch() } },
+                }))),
+            h('div', { className: 'dcv-searchStatus' }, status),
+            state.truncated ? h('div', { className: 'dcv-banner' }, t('search.truncated')) : null,
+            state.report === null ? null : h('div', { className: 'dcv-banner' }, renderReplaceReport(state.report)),
+            h('div', { className: 'dcv-searchResults' }, state.files.map(file => h('div', { key: file.path, className: 'dcv-searchFileGroup' },
+              h('div', { className: 'dcv-searchFileHead' },
+                h(MaterialIcon, { name: baseName(file.path), size: 13 }),
+                h('span', { className: 'dcv-searchFileName', title: file.path }, file.path),
+                h('span', { className: 'dcv-searchCount' }, String(file.matches.length)),
+                h('button', {
+                  type: 'button', className: 'dcv-searchAction',
+                  title: t('search.replaceOne'),
+                  disabled: state.replacing,
+                  onClick: () => { void replaceMatches(file.path) },
+                }, t('search.replaceOneShort'))),
+              file.matches.map((match, index) => h('button', {
+                key: index,
+                type: 'button',
+                className: 'dcv-searchHit',
+                title: `${file.path}:${match.line}`,
+                onClick: () => { void openFile(file.path, { line: match.line }) },
+              },
+              h('span', { className: 'dcv-searchHitNo' }, String(match.line)),
+              h('span', { className: 'dcv-searchHitText' }, match.text)))))))
+        }
+
+        /** Quick open and the command palette, as one overlay. */
+        function renderPalette() {
+          if (palette === null) return null
+          const items = paletteItems
+          const mode = palette.mode
+          const placeholder = mode === 'commands' ? t('palette.commandPlaceholder') : t('palette.filePlaceholder')
+          const emptyText = mode === 'files' && fileIndex.status === 'error'
+            ? `${t('palette.indexFailed')}: ${fileIndex.error === null ? '' : fileIndex.error}`
+            : mode === 'files' && fileIndex.status === 'loading'
+              ? t('palette.loading')
+              : mode === 'commands' ? t('palette.noCommand') : t('palette.noFile')
+          return h('div', {
+            className: 'dcv-palette',
+            onMouseDown: (event) => { if (event.target === event.currentTarget) setPalette(null) },
+          },
+          h('div', { className: 'dcv-paletteBox' },
+            h('div', { className: 'dcv-paletteHead' },
+              h(IconSearch, { size: 13 }),
+              h('input', {
+                className: 'dcv-paletteInput',
+                autoFocus: true,
+                placeholder,
+                value: palette.query,
+                spellCheck: false,
+                'aria-label': placeholder,
+                onChange: (event) => {
+                  const value = event.target.value
+                  if (mode === 'files' && value.startsWith('>')) {
+                    setPalette({ mode: 'commands', query: value.slice(1), index: 0 })
+                    return
+                  }
+                  setPalette({ ...palette, query: value, index: 0 })
+                },
+                onKeyDown: (event) => {
+                  if (event.key === 'Escape') { event.preventDefault(); setPalette(null); return }
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault()
+                    setPalette(previous => (previous === null ? previous : { ...previous, index: Math.min(previous.index + 1, Math.max(items.length - 1, 0)) }))
+                    return
+                  }
+                  if (event.key === 'ArrowUp') {
+                    event.preventDefault()
+                    setPalette(previous => (previous === null ? previous : { ...previous, index: Math.max(previous.index - 1, 0) }))
+                    return
+                  }
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    runPaletteItem(items[palette.index])
+                  }
+                },
+              })),
+            h('div', { className: 'dcv-paletteList' }, items.length === 0
+              ? h('div', { className: 'dcv-paletteEmpty' }, emptyText)
+              : items.map((item, index) => {
+                const active = index === palette.index
+                const label = mode === 'commands' ? item.label : item.path
+                return h('button', {
+                  key: mode === 'commands' ? item.id : item.path,
+                  type: 'button',
+                  className: 'dcv-paletteItem' + (active ? ' is-active' : ''),
+                  onMouseEnter: () => { setPalette(previous => (previous === null ? previous : { ...previous, index })) },
+                  onClick: () => { runPaletteItem(item) },
+                },
+                h('span', { className: 'dcv-paletteLabel', title: label }, label),
+                mode === 'commands' && item.hint !== undefined
+                  ? h('span', { className: 'dcv-paletteKeys' }, item.hint)
+                  : null)
+              })),
+            h('div', { className: 'dcv-paletteHint' },
+              mode === 'commands' ? t('palette.commandHint') : t('palette.fileHint', { line: ':12' }))))
         }
 
         function renderCommitView() {
@@ -3603,6 +4521,16 @@ window.__ModuleLoader__.load({
                 },
               }, t('tab.graph')),
               h('button', {
+                type: 'button', className: 'dcv-tab' + (mode === 'search' ? ' is-on' : ''),
+                title: t('command.search'),
+                onClick: () => { openSearch() },
+              }, t('tab.search')),
+              h('button', {
+                type: 'button', className: 'dcv-tool dcv-mini',
+                title: t('action.palette'), 'aria-label': t('action.palette'),
+                onClick: () => { openPalette('files') },
+              }, h(IconSearch, { size: 14 })),
+              h('button', {
                 type: 'button',
                 className: 'dcv-tool dcv-mini' + (termOpen ? ' is-on' : ''),
                 title: t('term.toggle'),
@@ -3613,7 +4541,7 @@ window.__ModuleLoader__.load({
                 type: 'button', className: 'dcv-tool', title: `${t('action.reference')} (${shortcutHint()})`,
                 disabled: inputActions === undefined, onClick: referencedNow,
               }, h(IconLink, { size: 13 }), h('span', null, t('action.referenceShort'))),
-              h('button', { type: 'button', className: 'dcv-tool dcv-mini', title: t('action.reload'), onClick: reload },
+              h('button', { type: 'button', className: 'dcv-tool dcv-mini', title: t('action.reload'), onClick: () => { void reload() } },
                 h(IconRefresh, { size: 14 })))),
           h('div', { className: 'dcv-body', ref: bodyRef },
             h('div', { className: 'dcv-tree', style: { flex: `0 0 ${treeWidth}px` } },
@@ -3652,7 +4580,9 @@ window.__ModuleLoader__.load({
                 if (mode !== 'files' || selected === null || doc.status !== 'ready') return
                 openMenu(event, { kind: 'doc', path: selected.path })
               },
-            }, mode === 'files' ? renderDocPane() : renderGitPane())),
+            }, mode === 'files'
+              ? h('div', { className: 'dcv-filesPane' }, renderTabBar(), renderDocPane())
+              : mode === 'search' ? renderSearchPane() : renderGitPane())),
           termOpen ? h('div', { className: 'dcv-termWrap', style: { height: `${termHeight}px` } },
             h('div', {
               key: 'h-resizer',
@@ -3663,6 +4593,7 @@ window.__ModuleLoader__.load({
               onPointerDown: startTermResize,
             }),
             h(TerminalDock, { key: 'terminal', sessionId, t, onClose: () => { setTermOpen(false) } })) : null,
+          renderPalette(),
           renderContextMenu(),
           notice === null ? null : h('div', { className: 'dcv-notice' }, notice))
       }

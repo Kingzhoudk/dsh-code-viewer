@@ -16,6 +16,9 @@
  *   /plugins/code-viewer/stat?path=<abs dir>&rel=<rel>    one file's mtime and size
  *   POST /plugins/code-viewer/write                      save one text file (conflict-checked)
  *   /plugins/code-viewer/fileDiff?path=<abs dir>&rel=<rel>  working-tree line marks vs HEAD
+ *   /plugins/code-viewer/search?path=<abs dir>&q=<text>  workspace text/regex search (rg, Node fallback)
+ *   /plugins/code-viewer/files?path=<abs dir>            workspace file index for quick open
+ *   POST /plugins/code-viewer/replace                    replace across the workspace or one file
  *
  * Safety posture: the route only reads. Git runs with prompts, hooks, optional
  * index writes and lazy fetches disabled, an argument whitelist is fixed here
@@ -87,6 +90,27 @@ const MAX_PATCH_CHARS = 400000
 
 /** Largest accepted commit count. */
 const MAX_COMMITS = 400
+
+/** Workspace search: caps shared by the rg path and the Node fallback. */
+const SEARCH_MAX_FILE_BYTES = 2 * 1024 * 1024
+const SEARCH_DEFAULT_MATCHES = 2000
+const SEARCH_MAX_MATCHES = 5000
+const SEARCH_MAX_RESULT_FILES = 500
+const SEARCH_MAX_TEXT = 400
+const SEARCH_TIMEOUT_MS = 8000
+const FILES_DEFAULT = 20000
+const FILES_MAX = 50000
+const REPLACE_MAX_FILES = 200
+const REPLACE_MAX_MATCHES = 5000
+
+/** Directories the panel hides; search and the file index skip them too. */
+const WALK_IGNORED = new Set([
+  '.git', 'node_modules', 'dist', 'build', 'out', 'target', '__pycache__',
+  '.venv', 'venv', '.idea', '.turbo', '.cache',
+])
+
+/** rg globs for the same directories (relative to the search root). */
+const SEARCH_EXCLUDES = [...WALK_IGNORED].map((name) => `!**/${name}/**`)
 
 /** Field and record separators of the log format below. */
 const FS = '\u001f'
@@ -647,11 +671,488 @@ async function receiveFileOperation(res, req, root, operation) {
   }
 }
 
+/* ------------------------------------------------------------------ search */
+
+/** A caller error answered with 4xx instead of 500. */
+function badRequest(message) {
+  return Object.assign(new Error(message), { status: 400 })
+}
+
+/** Parse a bounded positive integer query parameter. */
+function clampInt(raw, fallback, maximum) {
+  const value = Number.parseInt(String(raw ?? ''), 10)
+  if (!Number.isFinite(value) || value <= 0) return Math.min(fallback, maximum)
+  return Math.min(value, maximum)
+}
+
+/** POSIX form of one workspace-relative path. */
+function normalizeRel(value) {
+  return String(value).replace(/\\/gu, '/').replace(/^\.\//u, '')
+}
+
+/** Escape one literal for use inside a regular expression. */
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+}
+
+/**
+ * Compile the "files to include" filter into rg globs and a matcher over
+ * workspace-relative paths. Up to four comma-separated globs.
+ */
+function parseIncludes(raw) {
+  if (typeof raw !== 'string' || raw.trim() === '') return { globs: [], matchers: [] }
+  const parts = raw.split(',').map((part) => part.trim()).filter((part) => part !== '')
+  if (parts.length > 4) throw badRequest('at most four include globs')
+  const globs = []
+  const matchers = []
+  for (const part of parts) {
+    if (part.length > 200) throw badRequest('include glob is too long')
+    if (part.startsWith('!') || isAbsolute(part) || part.split(/[\\/]+/u).includes('..')) {
+      throw badRequest('include globs must be relative and positive')
+    }
+    const pattern = normalizeRel(part)
+    globs.push(pattern)
+    matchers.push(globToRegExp(pattern))
+  }
+  return { globs, matchers }
+}
+
+/** Minimal glob (`*`, `**`, `?`) to a matcher over workspace-relative paths. */
+function globToRegExp(pattern) {
+  let source = ''
+  for (let index = 0; index < pattern.length; index += 1) {
+    const char = pattern[index]
+    if (char === '*') {
+      if (pattern[index + 1] === '*') {
+        index += 1
+        if (pattern[index + 1] === '/') {
+          index += 1
+          source += '(?:.*/)?'
+        } else {
+          source += '.*'
+        }
+      } else {
+        source += '[^/]*'
+      }
+    } else if (char === '?') {
+      source += '[^/]'
+    } else {
+      source += escapeRegExp(char)
+    }
+  }
+  const body = pattern.includes('/') ? `^${source}$` : `(?:^|/)${source}$`
+  return new RegExp(body, 'u')
+}
+
+/** Build the shared query matcher; `g` so replacement and counting agree. */
+function compileQuery(options) {
+  let source = options.regex ? options.query : escapeRegExp(options.query)
+  if (options.wholeWord) source = `\\b(?:${source})\\b`
+  const flags = options.caseSensitive ? 'gu' : 'giu'
+  try {
+    return new RegExp(source, flags)
+  } catch (_invalid) {
+    throw badRequest('invalid regular expression')
+  }
+}
+
+/** Count matches without letting a zero-width pattern spin forever. */
+function countMatches(pattern, text) {
+  let count = 0
+  pattern.lastIndex = 0
+  let match = pattern.exec(text)
+  while (match !== null) {
+    count += 1
+    if (count >= SEARCH_MAX_MATCHES) break
+    if (match[0] === '') pattern.lastIndex += 1
+    match = pattern.exec(text)
+  }
+  pattern.lastIndex = 0
+  return count
+}
+
+/** Decode the column of a byte offset in one line (rg reports bytes). */
+function columnOf(line, byteStart) {
+  try {
+    const bytes = Buffer.from(line, 'utf8')
+    return bytes.subarray(0, Math.max(0, Math.min(byteStart, bytes.length))).toString('utf8').length + 1
+  } catch (_unreadable) {
+    return byteStart + 1
+  }
+}
+
+/** One line, stripped of carriage returns and ANSI and clipped for transport. */
+function searchLineText(value) {
+  const text = String(value).replace(/\u001b\[[0-9;]*m/gu, '').replace(/\r$/u, '')
+  return text.length > SEARCH_MAX_TEXT ? `${text.slice(0, SEARCH_MAX_TEXT)}…` : text
+}
+
+/** Validate the query parameters shared by search and replace. */
+function readSearchOptions(params) {
+  const query = params.get('q') ?? ''
+  if (query === '' || query.length > 500) throw badRequest('q must be 1..500 characters')
+  if (query.includes('\n')) throw badRequest('q must be a single line')
+  const { globs, matchers } = parseIncludes(params.get('include') ?? '')
+  return {
+    query,
+    regex: params.get('regex') === '1',
+    caseSensitive: params.get('case') === '1',
+    wholeWord: params.get('word') === '1',
+    includeGlobs: globs,
+    includeMatchers: matchers,
+    max: clampInt(params.get('max'), SEARCH_DEFAULT_MATCHES, SEARCH_MAX_MATCHES),
+  }
+}
+
+/** Run one rg invocation with a deadline and a byte cap. */
+function runRg(root, args) {
+  return new Promise((resolvePromise) => {
+    let child
+    try {
+      child = spawn('rg', args, {
+        cwd: root,
+        env: { ...process.env, LC_ALL: 'C' },
+        stdio: ['ignore', 'pipe', 'ignore'],
+        windowsHide: true,
+      })
+    } catch (_spawnFailed) {
+      resolvePromise({ missing: true })
+      return
+    }
+    const chunks = []
+    let size = 0
+    let settled = false
+    let timer = null
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      if (timer !== null) clearTimeout(timer)
+      try { child.kill('SIGKILL') } catch (_gone) { /* already exited */ }
+      resolvePromise(value)
+    }
+    timer = setTimeout(() => finish({ ok: false, timeout: true }), SEARCH_TIMEOUT_MS)
+    child.once('error', () => finish({ missing: true }))
+    child.stdout.on('data', (chunk) => {
+      if (settled) return
+      size += chunk.length
+      if (size > MAX_OUTPUT_BYTES) {
+        finish({ ok: true, text: Buffer.concat(chunks).toString('utf8'), truncated: true, code: 0 })
+        return
+      }
+      chunks.push(chunk)
+    })
+    child.once('close', (code) => {
+      finish({ ok: true, text: Buffer.concat(chunks).toString('utf8'), truncated: false, code })
+    })
+  })
+}
+
+/** rg argv for one search; every caller-supplied part is validated already. */
+function rgSearchArgs(options) {
+  const args = ['--json', '--hidden', '--no-config', '--no-messages', '--max-filesize', '2M']
+  for (const glob of SEARCH_EXCLUDES) args.push('--glob', glob)
+  args.push(options.caseSensitive ? '--case-sensitive' : '--ignore-case')
+  if (options.wholeWord) args.push('--word-regexp')
+  if (!options.regex) args.push('--fixed-strings')
+  for (const glob of options.includeGlobs) args.push('--glob', glob)
+  args.push('-e', options.query, '.')
+  return args
+}
+
+/** Parse `rg --json` output into the panel's grouped shape. */
+function parseRgMatches(text, options) {
+  const grouped = new Map()
+  let totalMatches = 0
+  let truncated = false
+  for (const line of text.split('\n')) {
+    if (line === '' || line[0] !== '{') continue
+    let record
+    try { record = JSON.parse(line) } catch (_partial) { continue }
+    if (record === null || record.type !== 'match' || record.data === undefined) continue
+    const data = record.data
+    const rawPath = data.path !== undefined && data.path.text !== undefined ? data.path.text : ''
+    const rel = normalizeRel(rawPath)
+    if (rel === '' || rel.split('/').includes('.git')) continue
+    const body = data.lines !== undefined && typeof data.lines.text === 'string' ? data.lines.text : ''
+    const lineText = searchLineText(body)
+    const lineNumber = Number(data.line_number)
+    if (!Number.isFinite(lineNumber)) continue
+    const submatches = Array.isArray(data.submatches) ? data.submatches : []
+    if (submatches.length === 0) continue
+    let bucket = grouped.get(rel)
+    if (bucket === undefined) {
+      if (grouped.size >= SEARCH_MAX_RESULT_FILES) { truncated = true; break }
+      bucket = []
+      grouped.set(rel, bucket)
+    }
+    for (const submatch of submatches) {
+      if (totalMatches >= options.max) { truncated = true; break }
+      bucket.push({
+        line: lineNumber,
+        column: columnOf(body, Number(submatch.start) || 0),
+        text: lineText,
+      })
+      totalMatches += 1
+    }
+    if (totalMatches >= options.max) { truncated = true; break }
+  }
+  return {
+    files: [...grouped].map(([path, matches]) => ({ path, matches })),
+    totalMatches,
+    truncated,
+  }
+}
+
+/** Every non-ignored regular file under `root`, relative and POSIX-shaped. */
+async function walkWorkspace(root, options) {
+  const files = []
+  let truncated = false
+  const stack = ['']
+  const maxFiles = options.maxFiles === undefined ? FILES_MAX : options.maxFiles
+  while (stack.length > 0) {
+    const dirRel = stack.pop()
+    let entries = []
+    try {
+      entries = await readdir(dirRel === '' ? root : resolve(root, dirRel), { withFileTypes: true })
+    } catch (_unreadable) {
+      continue
+    }
+    for (const entry of entries) {
+      const rel = dirRel === '' ? entry.name : `${dirRel}/${entry.name}`
+      if (entry.isDirectory()) {
+        if (WALK_IGNORED.has(entry.name)) continue
+        stack.push(rel)
+        continue
+      }
+      if (!entry.isFile() || entry.name === '.DS_Store') continue
+      if (files.length >= maxFiles) { truncated = true; break }
+      files.push(rel)
+    }
+    if (truncated) break
+  }
+  return { files, truncated }
+}
+
+/** Node fallback: read files line by line and match with the compiled query. */
+async function searchWithNode(root, options) {
+  const pattern = compileQuery(options)
+  const walked = await walkWorkspace(root, { maxFiles: FILES_MAX })
+  const files = []
+  let totalMatches = 0
+  let truncated = walked.truncated
+  for (const rel of walked.files) {
+    if (options.includeMatchers.length > 0 && !options.includeMatchers.some((matcher) => matcher.test(rel))) continue
+    if (totalMatches >= options.max) { truncated = true; break }
+    const absolute = resolve(root, rel)
+    let info
+    try { info = await stat(absolute) } catch (_missing) { continue }
+    if (!info.isFile() || info.size > SEARCH_MAX_FILE_BYTES) continue
+    let buffer
+    try { buffer = await readFile(absolute) } catch (_unreadable) { continue }
+    if (buffer.includes(0)) continue
+    const text = buffer.toString('utf8')
+    const matches = []
+    const lines = text.split('\n')
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index].replace(/\r$/u, '')
+      if (line === '') continue
+      pattern.lastIndex = 0
+      let match = pattern.exec(line)
+      while (match !== null) {
+        if (matches.length + totalMatches >= options.max) { truncated = true; break }
+        matches.push({ line: index + 1, column: match.index + 1, text: searchLineText(line) })
+        if (match[0] === '') pattern.lastIndex += 1
+        match = pattern.exec(line)
+      }
+      if (truncated) break
+    }
+    pattern.lastIndex = 0
+    if (matches.length > 0) {
+      if (files.length >= SEARCH_MAX_RESULT_FILES) { truncated = true; break }
+      files.push({ path: rel, matches })
+      totalMatches += matches.length
+    }
+  }
+  return { engine: 'node', files, totalMatches, truncated }
+}
+
+/**
+ * Search one workspace for text or a regular expression.
+ *
+ * rg carries the fast path (and honours .gitignore); a cancelled or missing rg
+ * falls back to a bounded Node walk. Results are grouped by file and capped.
+ */
+async function searchWorkspace(root, options) {
+  const query = options.query
+  const shared = {
+    query,
+    regex: options.regex === true,
+    caseSensitive: options.caseSensitive === true,
+    wholeWord: options.wholeWord === true,
+    includeGlobs: Array.isArray(options.includeGlobs) ? options.includeGlobs : [],
+    includeMatchers: Array.isArray(options.includeMatchers) ? options.includeMatchers : [],
+    max: clampInt(options.max, SEARCH_DEFAULT_MATCHES, SEARCH_MAX_MATCHES),
+  }
+  if (shared.query === undefined || typeof shared.query !== 'string' || shared.query === '' || shared.query.length > 500) {
+    throw badRequest('q must be 1..500 characters')
+  }
+  if (options.forceNode !== true) {
+    const rg = await runRg(root, rgSearchArgs(shared))
+    if (rg.missing !== true && rg.ok === true && (rg.text !== '' || rg.code === 0 || rg.code === 1)) {
+      const parsed = parseRgMatches(rg.text, shared)
+      return {
+        engine: 'rg',
+        files: parsed.files,
+        totalMatches: parsed.totalMatches,
+        truncated: parsed.truncated || rg.truncated === true,
+      }
+    }
+  }
+  return searchWithNode(root, shared)
+}
+
+/** Every workspace file, for the quick-open index. */
+async function indexWorkspaceFiles(root, options) {
+  const max = clampInt(options.max, FILES_DEFAULT, FILES_MAX)
+  if (options.forceNode !== true) {
+    const args = ['--files', '--hidden', '--no-config', '--no-messages']
+    for (const glob of SEARCH_EXCLUDES) args.push('--glob', glob)
+    const rg = await runRg(root, args)
+    if (rg.missing !== true && rg.ok === true && (rg.text !== '' || rg.code === 0 || rg.code === 1)) {
+      const files = []
+      let truncated = rg.truncated === true
+      for (const line of rg.text.split('\n')) {
+        if (line === '') continue
+        const rel = normalizeRel(line)
+        if (rel === '' || rel.split('/').includes('.git')) continue
+        if (files.length >= max) { truncated = true; break }
+        files.push(rel)
+      }
+      files.sort()
+      return { engine: 'rg', files, truncated }
+    }
+  }
+  const walked = await walkWorkspace(root, { maxFiles: max })
+  const files = walked.files.filter((rel) => !rel.split('/').includes('.git')).sort()
+  return { engine: 'node', files, truncated: walked.truncated }
+}
+
+/**
+ * Replace every occurrence in the workspace, or in one file.
+ *
+ * Candidate files come from the same search the panel just ran, so the query,
+ * options and filters agree. Each file is re-read, size/binary checked, refused
+ * when outside the workspace or inside `.git`, and rewritten only when the text
+ * actually changes.
+ */
+async function replaceWorkspace(root, options) {
+  const query = options.query
+  if (typeof query !== 'string' || query === '' || query.length > 500) throw badRequest('q must be 1..500 characters')
+  if (typeof options.replacement !== 'string' || options.replacement.length > 2000) {
+    throw badRequest('replacement must be a string of at most 2000 characters')
+  }
+  const pattern = compileQuery({
+    query,
+    regex: options.regex === true,
+    caseSensitive: options.caseSensitive === true,
+    wholeWord: options.wholeWord === true,
+  })
+  const includeMatchers = Array.isArray(options.includeMatchers) ? options.includeMatchers : []
+  const explicit = typeof options.file === 'string' && options.file !== '' ? normalizeRel(options.file) : null
+  let candidates = []
+  let truncated = false
+  let engine = 'node'
+  if (explicit !== null) {
+    candidates = [explicit]
+  } else {
+    const found = await searchWorkspace(root, {
+      query,
+      regex: options.regex === true,
+      caseSensitive: options.caseSensitive === true,
+      wholeWord: options.wholeWord === true,
+      includeGlobs: Array.isArray(options.includeGlobs) ? options.includeGlobs : [],
+      includeMatchers,
+      max: REPLACE_MAX_MATCHES,
+    })
+    candidates = found.files.map((file) => file.path)
+    truncated = found.truncated === true
+    engine = found.engine
+    if (candidates.length > REPLACE_MAX_FILES) {
+      candidates = candidates.slice(0, REPLACE_MAX_FILES)
+      truncated = true
+    }
+  }
+  const changed = []
+  const skipped = []
+  let totalReplacements = 0
+  for (const rel of candidates) {
+    if (totalReplacements >= REPLACE_MAX_MATCHES) { truncated = true; break }
+    if (isRefusedRel(rel)) {
+      skipped.push({ rel, reason: 'outside' })
+      continue
+    }
+    if (includeMatchers.length > 0 && !includeMatchers.some((matcher) => matcher.test(rel))) {
+      skipped.push({ rel, reason: 'filtered' })
+      continue
+    }
+    const found = await locateInside(root, rel)
+    if (found === undefined) { skipped.push({ rel, reason: 'not-found' }); continue }
+    if (!found.info.isFile()) { skipped.push({ rel, reason: 'not-found' }); continue }
+    if (found.info.size > SEARCH_MAX_FILE_BYTES) { skipped.push({ rel, reason: 'large' }); continue }
+    let buffer
+    try { buffer = await readFile(found.target) } catch (_unreadable) { skipped.push({ rel, reason: 'not-found' }); continue }
+    if (buffer.includes(0)) { skipped.push({ rel, reason: 'binary' }); continue }
+    const text = buffer.toString('utf8')
+    const count = Math.min(countMatches(pattern, text), REPLACE_MAX_MATCHES - totalReplacements)
+    if (count === 0) { skipped.push({ rel, reason: 'unchanged' }); continue }
+    const next = text.replace(pattern, () => options.replacement)
+    pattern.lastIndex = 0
+    if (Buffer.byteLength(next) > WRITE_LIMIT) { skipped.push({ rel, reason: 'large' }); continue }
+    try {
+      await writeFile(found.target, next, 'utf8')
+    } catch (error) {
+      skipped.push({ rel, reason: 'error', detail: error instanceof Error ? error.message : String(error) })
+      continue
+    }
+    changed.push({ rel, count })
+    totalReplacements += count
+  }
+  return { engine, totalReplacements, changed, skipped, truncated }
+}
+
+/** Validate one replacement request body (everything but the path is in JSON). */
+function readReplaceOptions(body) {
+  if (body === null || typeof body !== 'object') throw badRequest('missing body')
+  const query = typeof body.q === 'string' ? body.q : ''
+  if (query === '' || query.length > 500) throw badRequest('q must be 1..500 characters')
+  if (query.includes('\n')) throw badRequest('q must be a single line')
+  if (typeof body.replacement !== 'string' || body.replacement.length > 2000) {
+    throw badRequest('replacement must be a string of at most 2000 characters')
+  }
+  const { globs, matchers } = parseIncludes(typeof body.include === 'string' ? body.include : '')
+  const file = typeof body.file === 'string' && body.file !== '' ? body.file : undefined
+  if (file !== undefined) {
+    if (file.length > 500) throw badRequest('file path is too long')
+    if (isRefusedRel(normalizeRel(file))) throw badRequest('file must be inside the workspace')
+  }
+  return {
+    query,
+    replacement: body.replacement,
+    regex: body.regex === true || body.regex === '1',
+    caseSensitive: body.case === true || body.case === '1',
+    wholeWord: body.word === true || body.word === '1',
+    includeGlobs: globs,
+    includeMatchers: matchers,
+    max: SEARCH_MAX_MATCHES,
+    file,
+  }
+}
+
 /** Dispatch one request under the route prefix. */
 async function handle(req, res, connection) {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const sub = url.pathname.slice(ROUTE.length)
-  const postEndpoints = new Set(['/write', '/mkdir', '/touch', '/rename', '/delete', '/copy', '/reveal'])
+  const postEndpoints = new Set(['/write', '/mkdir', '/touch', '/rename', '/delete', '/copy', '/reveal', '/replace'])
   const methodAllowed = postEndpoints.has(sub)
     ? req.method === 'POST'
     : (req.method === 'GET' || req.method === 'HEAD')
@@ -677,6 +1178,16 @@ async function handle(req, res, connection) {
   }
   const path = url.searchParams.get('path') ?? ''
   try {
+    if (sub === '/search') {
+      const root = await requireDirectory(path)
+      send(res, 200, await searchWorkspace(root, readSearchOptions(url.searchParams)))
+      return
+    }
+    if (sub === '/files') {
+      const root = await requireDirectory(path)
+      send(res, 200, await indexWorkspaceFiles(root, { max: url.searchParams.get('max') }))
+      return
+    }
     if (sub === '/repo') {
       const root = await requireRepository(await requireDirectory(path))
       send(res, 200, await readRepoInfo(root))
@@ -739,6 +1250,18 @@ async function handle(req, res, connection) {
       await receiveWrite(res, req, await requireDirectory(path))
       return
     }
+    if (sub === '/replace') {
+      const root = await requireDirectory(path)
+      let body
+      try {
+        body = await readJsonBody(req, 64 * 1024)
+      } catch (error) {
+        send(res, error.status === undefined ? 400 : error.status, { error: error instanceof Error ? error.message : String(error) })
+        return
+      }
+      send(res, 200, await replaceWorkspace(root, readReplaceOptions(body)))
+      return
+    }
     if (sub === '/mkdir' || sub === '/touch' || sub === '/rename' || sub === '/delete' || sub === '/copy' || sub === '/reveal') {
       const dir = await requireDirectory(path)
       await receiveFileOperation(res, req, dir, sub.slice(1))
@@ -747,7 +1270,7 @@ async function handle(req, res, connection) {
     send(res, 404, { error: 'unknown endpoint' })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    send(res, 500, { error: message })
+    send(res, typeof error.status === 'number' ? error.status : 500, { error: message })
   }
 }
 
@@ -755,7 +1278,7 @@ async function handle(req, res, connection) {
  * Register the panel's read-only Git route for this plugin's lifetime.
  * @param ctx - host root context carrying the browser HTTP carrier.
  */
-export { locateInside, readStatusTree, receiveFileOperation, receiveWrite, sendAsset, sendFileDiff, sendImage, sendStat }
+export { handle, indexWorkspaceFiles, locateInside, readStatusTree, receiveFileOperation, receiveWrite, replaceWorkspace, searchWorkspace, sendAsset, sendFileDiff, sendImage, sendStat }
 
 export function apply(ctx) {
   ctx.effect(() => ctx.webServer.register({
