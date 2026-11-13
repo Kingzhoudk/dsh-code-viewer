@@ -167,6 +167,12 @@ window.__ModuleLoader__.load({
       'tab.close': 'Close this tab',
       'tab.saveAll': 'Save all files',
       'tab.closeAll': 'Close all tabs',
+      'tab.preview': 'Preview — double-click to pin',
+      'menu.closeTab': 'Close',
+      'menu.closeOthers': 'Close other tabs',
+      'menu.closeRight': 'Close tabs to the right',
+      'menu.closeLeft': 'Close tabs to the left',
+      'menu.pinTab': 'Pin this tab',
       'action.palette': 'Quick open and command palette (Ctrl+P)',
       'search.placeholder': 'Search in workspace',
       'search.replacePlaceholder': 'Replace with',
@@ -346,6 +352,12 @@ window.__ModuleLoader__.load({
       'tab.close': '关闭这个标签',
       'tab.saveAll': '保存全部文件',
       'tab.closeAll': '关闭全部标签',
+      'tab.preview': '预览（双击固定）',
+      'menu.closeTab': '关闭',
+      'menu.closeOthers': '关闭其它标签',
+      'menu.closeRight': '关闭右侧标签',
+      'menu.closeLeft': '关闭左侧标签',
+      'menu.pinTab': '固定这个标签',
       'action.palette': '快速打开与命令面板（Ctrl+P）',
       'search.placeholder': '在工作区中搜索',
       'search.replacePlaceholder': '替换为',
@@ -655,6 +667,7 @@ window.__ModuleLoader__.load({
 .dcv-tabItem.is-active { background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary);
   box-shadow: inset 0 -2px 0 var(--dsw-alias-brand-primary); }
 .dcv-tabName { overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+.dcv-tabItem.is-preview .dcv-tabName { font-style: italic; }
 .dcv-tabDirty { font-size: 11px; color: var(--dsw-alias-state-warn-primary); }
 .dcv-tabClose { display: inline-flex; align-items: center; border: none; background: transparent; padding: 1px;
   border-radius: 4px; color: var(--dsw-alias-label-secondary); cursor: pointer; }
@@ -2996,6 +3009,7 @@ window.__ModuleLoader__.load({
           const token = readSeqRef.current + 1
           readSeqRef.current = token
           setPreview(false)
+          setJsonPretty(true)
           setEditText('')
           setEditMtime(null)
           setSaveState('idle')
@@ -3044,6 +3058,19 @@ window.__ModuleLoader__.load({
         }, [cwd, readRemote, focusLine])
 
         /** Switch to one tab, flushing the buffer that is on screen first. */
+        /** Promote one preview tab to a pinned tab. */
+        const pinTab = useCallback((id) => {
+          const target = tabsRef.current.find(tab => tab.id === id)
+          if (target === undefined || target.preview !== true) return
+          commitTabs(tabsRef.current.map(tab => (tab.id === id ? { ...tab, preview: false } : tab)))
+        }, [commitTabs])
+
+        /** Editing a preview tab pins it, the way VS Code does. */
+        const pinActiveTab = useCallback(() => {
+          const id = activeIdRef.current
+          if (id !== null) pinTab(id)
+        }, [pinTab])
+
         const activateTab = useCallback(async (id, line) => {
           if (id === activeIdRef.current) {
             if (typeof line === 'number') requestAnimationFrame(() => focusLine(line))
@@ -3067,66 +3094,93 @@ window.__ModuleLoader__.load({
           }
         }, [applySnapshot, captureActive, flushActive, focusLine, persistActive, readIntoActive])
 
-        /** Open a file: reuse its tab, or create one after flushing the current. */
+        /** The blank snapshot a tab starts from before its file is read. */
+        const freshSnapshot = useCallback((path) => ({
+          path,
+          doc: { status: 'loading', path },
+          editText: '', editMtime: null, saveState: 'idle', saveMessage: null,
+          preview: false, jsonPretty: true, imageInfo: null,
+          diffMarks: {}, diffUntracked: false,
+          scrollTop: 0, selStart: null, selEnd: null,
+        }), [])
+
+        /**
+         * Open a file.
+         *
+         * `preview: true` (a single click) reuses the one preview tab, so
+         * browsing the tree never piles up tabs; a normal open pins its tab and
+         * likewise replaces the preview slot rather than adding next to it.
+         */
         const openFile = useCallback(async (path, options) => {
           const line = options !== undefined && options !== null && typeof options.line === 'number' ? options.line : undefined
+          const preview = options !== undefined && options !== null && options.preview === true
           const existing = tabsRef.current.find(tab => tab.path === path)
           if (existing !== undefined) {
+            if (!preview && existing.preview === true) pinTab(existing.id)
             await activateTab(existing.id, line)
             return
           }
           if (!(await flushActive())) return
           persistActive(captureActive())
-          const id = tabSeqRef.current + 1
-          tabSeqRef.current = id
-          const snapshot = {
-            path,
-            doc: { status: 'loading', path },
-            editText: '', editMtime: null, saveState: 'idle', saveMessage: null,
-            preview: false, jsonPretty: true, imageInfo: null,
-            diffMarks: {}, diffUntracked: false,
-            scrollTop: 0, selStart: null, selEnd: null,
+          const slot = tabsRef.current.find(tab => tab.preview === true)
+          let id
+          let next
+          if (slot !== undefined) {
+            id = slot.id
+            next = tabsRef.current.map(tab => (tab.id === slot.id
+              ? { id, path, name: baseName(path), preview, snapshot: freshSnapshot(path) }
+              : tab))
+          } else {
+            id = tabSeqRef.current + 1
+            tabSeqRef.current = id
+            next = [...tabsRef.current, { id, path, name: baseName(path), preview, snapshot: freshSnapshot(path) }]
           }
-          commitTabs([...tabsRef.current, { id, path, name: baseName(path), snapshot }])
+          commitTabs(next)
           setActiveId(id)
           activeIdRef.current = id
           setMode('files')
           setCommit({ status: 'idle' })
           await readIntoActive(path, line)
-        }, [activateTab, captureActive, commitTabs, flushActive, persistActive, readIntoActive])
+        }, [activateTab, captureActive, commitTabs, flushActive, freshSnapshot, persistActive, pinTab, readIntoActive])
 
-        /** Close one tab, picking its neighbour when it was the visible one. */
-        const closeTab = useCallback(async (id) => {
-          const index = tabsRef.current.findIndex(tab => tab.id === id)
-          if (index === -1) return
-          if (id === activeIdRef.current) {
-            if (!(await flushActive())) return
-            const next = tabsRef.current.filter(tab => tab.id !== id)
-            commitTabs(next)
-            const neighbour = next[Math.min(index, next.length - 1)]
-            if (neighbour === undefined) {
-              setActiveId(null)
-              activeIdRef.current = null
-              resetDocState()
-              return
-            }
-            setActiveId(neighbour.id)
-            activeIdRef.current = neighbour.id
-            applySnapshot(neighbour.snapshot)
+        /** Close several tabs; the visible one is flushed when it is in the set. */
+        const closeMany = useCallback(async (ids) => {
+          const set = new Set(ids)
+          if (set.size === 0) return
+          const entries = tabsRef.current.map((tab, index) => ({ tab, index }))
+          const active = activeIdRef.current
+          const activeIndex = entries.findIndex(entry => entry.tab.id === active)
+          if (active !== null && set.has(active) && !(await flushActive())) return
+          const survivors = entries.filter(entry => !set.has(entry.tab.id))
+          if (survivors.length === entries.length) return
+          commitTabs(survivors.map(entry => entry.tab))
+          if (active === null || !set.has(active)) return
+          // Prefer the nearest tab to the left, then the first one to the right.
+          let pick = null
+          for (const entry of survivors) { if (entry.index < activeIndex) pick = entry }
+          if (pick === null && survivors.length > 0) pick = survivors[0]
+          if (pick === null) {
+            setActiveId(null)
+            activeIdRef.current = null
+            resetDocState()
             return
           }
-          commitTabs(tabsRef.current.filter(tab => tab.id !== id))
-        }, [applySnapshot, commitTabs, flushActive, resetDocState])
+          setActiveId(pick.tab.id)
+          activeIdRef.current = pick.tab.id
+          applySnapshot(pick.tab.snapshot)
+          if (pick.tab.snapshot.doc !== undefined && pick.tab.snapshot.doc.status === 'loading') {
+            void readIntoActive(pick.tab.path)
+          }
+        }, [applySnapshot, commitTabs, flushActive, readIntoActive, resetDocState])
+
+        /** Close one tab. */
+        const closeTab = useCallback((id) => closeMany([id]), [closeMany])
 
         /** Close every tab (after flushing the one on screen). */
         const closeAllTabs = useCallback(async () => {
           if (tabsRef.current.length === 0) return
-          if (!(await flushActive())) return
-          commitTabs([])
-          setActiveId(null)
-          activeIdRef.current = null
-          resetDocState()
-        }, [commitTabs, flushActive, resetDocState])
+          await closeMany(tabsRef.current.map(tab => tab.id))
+        }, [closeMany])
 
         /** Save the visible buffer; background tabs are flushed on switch already. */
         const saveAll = useCallback(async () => {
@@ -3343,7 +3397,8 @@ window.__ModuleLoader__.load({
                 key: 'f:' + full, type: 'button',
                 className: 'dcv-row dcv-file' + (mark === null ? '' : ` is-changed is-${mark.cls}`) + (active ? ' is-active' : ''),
                 style: { paddingLeft: 18 + depth * 12 }, title: full,
-                onClick: () => { void openFile(full) },
+                onClick: () => { void openFile(full, { preview: true }) },
+                onDoubleClick: () => { void openFile(full) },
                 onContextMenu: (event) => { openMenu(event, { kind: 'file', path: full }) },
               }, h(MaterialIcon, { name: entry.name, size: 16 }), h('span', { className: 'dcv-name' }, entry.name),
               mark === null ? null : h('span', { className: `dcv-mark dcv-mark-${mark.cls}`, title: mark.label }, mark.letter)))
@@ -3630,6 +3685,24 @@ window.__ModuleLoader__.load({
         function buildMenuItems(entry) {
           const items = []
           const push = (id, label, run, options) => items.push({ id, label, run, ...options })
+          if (entry.kind === 'tab') {
+            const index = tabsRef.current.findIndex(tab => tab.id === entry.id)
+            if (index === -1) return items
+            const total = tabsRef.current.length
+            const target = tabsRef.current[index]
+            push('close-tab', t('menu.closeTab'), () => { void closeTab(entry.id) })
+            push('close-others', t('menu.closeOthers'), () => {
+              void closeMany(tabsRef.current.filter(tab => tab.id !== entry.id).map(tab => tab.id))
+            }, { disabled: total <= 1 })
+            push('close-right', t('menu.closeRight'), () => {
+              void closeMany(tabsRef.current.slice(index + 1).map(tab => tab.id))
+            }, { disabled: index >= total - 1 })
+            push('close-left', t('menu.closeLeft'), () => {
+              void closeMany(tabsRef.current.slice(0, index).map(tab => tab.id))
+            }, { disabled: index === 0 })
+            if (target.preview === true) push('pin-tab', t('menu.pinTab'), () => { pinTab(entry.id) })
+            return items
+          }
           if (entry.kind === 'editor') {
             push('copy', t('menu.copySelection'), () => { void writeClipboard(editorText()) }, { glyph: 'file' })
             push('paste', t('menu.pasteText'), () => { void pasteIntoEditor() }, { glyph: 'file' })
@@ -4002,7 +4075,7 @@ window.__ModuleLoader__.load({
                   autoComplete: 'off',
                   'aria-label': selected.path,
                   onContextMenu: (event) => { openMenu(event, { kind: 'editor' }) },
-                  onChange: (event) => { setEditText(event.target.value) },
+                  onChange: (event) => { setEditText(event.target.value); pinActiveTab() },
                   onScroll: (event) => {
                     if (gutterRef.current !== null) gutterRef.current.scrollTop = event.target.scrollTop
                     if (highlightRef.current !== null) {
@@ -4165,19 +4238,30 @@ window.__ModuleLoader__.load({
         /** The strip of open files below the header. */
         function renderTabBar() {
           if (tabs.length === 0) return null
-          return h('div', { className: 'dcv-tabbar' },
+          return h('div', {
+            className: 'dcv-tabbar',
+            onContextMenu: (event) => {
+              const node = event.target
+              if (node !== null && typeof node.closest === 'function' && node.closest('.dcv-tabbarActions') !== null) return
+              event.preventDefault()
+              if (activeId !== null) openMenu(event, { kind: 'tab', id: activeId })
+            },
+          },
             h('div', { className: 'dcv-tabbarList', role: 'tablist' }, tabs.map(tab => {
               const active = tab.id === activeId
               const dirty = active && dirtyRef.current
               return h('div', {
                 key: tab.id,
-                className: 'dcv-tabItem' + (active ? ' is-active' : ''),
+                className: 'dcv-tabItem' + (active ? ' is-active' : '')
+                  + (tab.preview === true ? ' is-preview' : ''),
                 role: 'tab',
                 tabIndex: 0,
                 'aria-selected': active ? 'true' : 'false',
-                title: tab.path,
+                title: tab.preview === true ? `${tab.path} · ${t('tab.preview')}` : tab.path,
                 onClick: () => { void activateTab(tab.id) },
+                onDoubleClick: () => { pinTab(tab.id) },
                 onAuxClick: (event) => { if (event.button === 1) { event.preventDefault(); void closeTab(tab.id) } },
+                onContextMenu: (event) => { event.preventDefault(); event.stopPropagation(); openMenu(event, { kind: 'tab', id: tab.id }) },
                 onKeyDown: (event) => {
                   if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void activateTab(tab.id) }
                 },
@@ -4298,7 +4382,7 @@ window.__ModuleLoader__.load({
                 type: 'button',
                 className: 'dcv-searchHit',
                 title: `${file.path}:${match.line}`,
-                onClick: () => { void openFile(file.path, { line: match.line }) },
+                onClick: () => { void openFile(file.path, { line: match.line, preview: true }) },
               },
               h('span', { className: 'dcv-searchHitNo' }, String(match.line)),
               h('span', { className: 'dcv-searchHitText' }, match.text)))))))

@@ -338,6 +338,12 @@ try {
       const paletteStates = [...editorStates]
       paletteStates[32] = { mode: 'files', query: 'a', index: 0 }
       render(paletteStates)
+      const previewStates = [...editorStates]
+      previewStates[29] = [{ ...tab, preview: true }]
+      render(previewStates)
+      const tabMenuStates = [...editorStates]
+      tabMenuStates[25] = { x: 12, y: 12, kind: 'tab', id: 1 }
+      render(tabMenuStates)
       const commandStates = [...baseStates]
       commandStates[32] = { mode: 'commands', query: 'save', index: 0 }
       commandStates[33] = { status: 'idle', cwd: null, files: [], truncated: false, error: null }
