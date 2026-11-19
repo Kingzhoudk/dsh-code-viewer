@@ -59,7 +59,8 @@ function fakeResponse() {
     headers: null,
     body: '',
     writeHead(status, headers) { this.statusCode = status; this.headers = headers },
-    end(text) { this.body = text },
+    setHeader(name, value) { this.headers = { ...this.headers, [name]: value } },
+    end(text = '') { this.body = text },
   }
 }
 
@@ -74,10 +75,13 @@ function fakeRequest(url, method = 'GET', body = undefined) {
   }
 }
 
+/** A connection stub that admits every request, like an authenticated page. */
+const admitted = { requestRejection: () => undefined }
+
 /** Dispatch one request through the real handler and decode its JSON answer. */
-async function dispatch(url, method = 'GET', body = undefined) {
+async function dispatch(url, method = 'GET', body = undefined, connection = admitted) {
   const res = fakeResponse()
-  await handle(fakeRequest(url, method, body), res, undefined)
+  await handle(fakeRequest(url, method, body), res, connection)
   return { status: res.statusCode, body: res.body === '' ? null : JSON.parse(res.body) }
 }
 
@@ -212,6 +216,34 @@ try {
     assert.equal(missingQuery.status, 400)
     const escape = await dispatch(`/plugins/code-viewer/search?path=${encodeURIComponent(base)}&q=alpha&include=${encodeURIComponent('../etc')}`)
     assert.equal(escape.status, 400)
+  })
+
+  await test('dispatch: the connection fence runs first and its status is the answer', async () => {
+    let calls = 0
+    const refusing = {
+      requestRejection(request) {
+        calls += 1
+        assert.equal(request.headers.host, 'localhost')
+        return 403
+      },
+    }
+    const read = await dispatch(`/plugins/code-viewer/search?path=${encodeURIComponent(base)}&q=alpha`, 'GET', undefined, refusing)
+    assert.equal(read.status, 403)
+    assert.equal(read.body, null)
+    // A method the route does not serve is still refused by the fence, not by 405.
+    const post = await dispatch(`/plugins/code-viewer/search?path=${encodeURIComponent(base)}`, 'POST', {}, refusing)
+    assert.equal(post.status, 403)
+    // An unauthenticated request (401) is answered the same way.
+    const unauthenticated = await dispatch('/plugins/code-viewer/files', 'GET', undefined, { requestRejection: () => 401 })
+    assert.equal(unauthenticated.status, 401)
+    assert.equal(calls, 2)
+  })
+
+  await test('dispatch: no connection service refuses instead of serving the surface', async () => {
+    const res = fakeResponse()
+    await handle(fakeRequest(`/plugins/code-viewer/search?path=${encodeURIComponent(base)}&q=alpha`), res, undefined)
+    assert.equal(res.statusCode, 401)
+    assert.deepEqual(JSON.parse(res.body), { error: 'connection service unavailable' })
   })
 
   await test('client bundle: evaluates with a stub loader and exports apply', async () => {

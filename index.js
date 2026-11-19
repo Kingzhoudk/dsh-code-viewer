@@ -20,11 +20,13 @@
  *   /plugins/code-viewer/files?path=<abs dir>            workspace file index for quick open
  *   POST /plugins/code-viewer/replace                    replace across the workspace or one file
  *
- * Safety posture: the route only reads. Git runs with prompts, hooks, optional
- * index writes and lazy fetches disabled, an argument whitelist is fixed here
- * (the caller supplies only a directory, a commit hash and a count), output is
- * byte-capped, every command has a deadline, and cross-origin browser requests
- * are refused.
+ * Safety posture: every request passes the connection service's fence first
+ * (`ctx.connection.requestRejection`: the Host/DNS-rebinding and Origin checks
+ * plus browser or API credential admission that `/api` uses), before the method
+ * check and any file or Git work. Git runs with prompts, hooks, optional index
+ * writes and lazy fetches disabled, an argument whitelist is fixed here (the
+ * caller supplies only a directory, a commit hash and a count), output is
+ * byte-capped, and every command has a deadline.
  */
 
 import { execFile, spawn } from 'node:child_process'
@@ -32,8 +34,8 @@ import { cp, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } f
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-/** Required host services: the browser HTTP carrier. */
-export const inject = ['webServer']
+/** Required host services: the browser HTTP carrier and its request trust fence. */
+export const inject = ['webServer', 'connection']
 
 /** The panel's route prefix. */
 const ROUTE = '/plugins/code-viewer'
@@ -1150,6 +1152,22 @@ function readReplaceOptions(body) {
 
 /** Dispatch one request under the route prefix. */
 async function handle(req, res, connection) {
+  // Named routes sit ahead of the API carrier's own gate, so the fence comes
+  // first: the connection service applies the Host (DNS-rebinding) and Origin
+  // checks plus browser or API credential admission that every other Web route
+  // gets. Without that service the route cannot be authenticated, so it refuses
+  // instead of serving an unprotected surface.
+  if (connection === undefined || typeof connection.requestRejection !== 'function') {
+    send(res, 401, { error: 'connection service unavailable' })
+    return
+  }
+  const refused = connection.requestRejection(req)
+  if (refused !== undefined) {
+    res.statusCode = refused
+    res.setHeader('cache-control', 'no-store')
+    res.end()
+    return
+  }
   const url = new URL(req.url ?? '/', 'http://localhost')
   const sub = url.pathname.slice(ROUTE.length)
   const postEndpoints = new Set(['/write', '/mkdir', '/touch', '/rename', '/delete', '/copy', '/reveal', '/replace'])
@@ -1159,22 +1177,6 @@ async function handle(req, res, connection) {
   if (!methodAllowed) {
     send(res, 405, { error: 'method not allowed' })
     return
-  }
-  // Named routes sit ahead of the API carrier's own gate, so this route asks the
-  // connection service for the same browser-session cookie check the page uses.
-  // Profiles without a connection service (desktop shells) skip it.
-  if (connection !== undefined && typeof connection.authorizeIndex === 'function') {
-    if (connection.authorizeIndex(req, res) !== true) return
-  }
-  // Same-origin guard: a browser cross-site request carries a foreign Origin.
-  const origin = req.headers.origin
-  if (typeof origin === 'string' && origin !== 'null') {
-    let originHost = null
-    try { originHost = new URL(origin).host } catch (_badOrigin) { originHost = null }
-    if (originHost === null || originHost !== req.headers.host) {
-      send(res, 403, { error: 'cross-origin request refused' })
-      return
-    }
   }
   const path = url.searchParams.get('path') ?? ''
   try {

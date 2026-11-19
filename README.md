@@ -64,7 +64,7 @@ https://github.com/material-extensions/vscode-material-icon-theme）的官方素
 - 保存：`POST /write` 只写**已存在的普通文本文件**；路径必须解析在工作区内（含软链 realpath 校验）、拒绝 `.git/` 内部；body 上限 8 MiB；带 `baseMtime` 时与磁盘 mtime 不一致返回 409，不会静默覆盖。不新建、不删除文件。
 - 提交 hash 用 `^[0-9a-f]{4,40}$` 校验，避免参数注入；目录必须存在且为绝对路径。
 - Git 子进程禁用交互提示、hooks、可选索引写入与惰性拉取，单命令 8 秒超时、8 MiB 输出上限、`LC_ALL=C`。
-- 路由沿用页面自己的浏览器会话 Cookie 校验（`connection.authorizeIndex`）：未认证请求返回 401；同时拒绝跨站 `Origin`。桌面外壳里没有 connection 服务时跳过该校验。
+- 路由先过 DSH 的 connection 访问检查（`ctx.connection.requestRejection`，与 `/api` 同一套 Host／DNS-rebinding 与 Origin 校验加浏览器凭据认证）：未认证返回 401、不受信 Host 或跨站请求返回 403，且这项检查在方法判定与任何文件、Git 访问之前执行；没有 connection 服务时路由直接拒绝（401），不会失去保护地继续服务。
 
 ## 安装
 
